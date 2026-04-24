@@ -784,6 +784,9 @@ let DB = {
   nextIssueId: 1,
   nextUserId: 5,
   nextWsId: 5,
+  // Per-role tab permissions: view + interact (edit/create/drag)
+  // Pages: dashboard, issues, kanban, gantt, workstreams, settings
+  permissions: null, // populated by initPermissions()
 };
 
 let currentUser = null;
@@ -791,9 +794,43 @@ let editingIssueId = null;
 let editingUserId = null;
 let editingWsId = null;
 let chartInstances = {};
+let appSeeded = false; // fix: prevent re-seeding sample issues on every login
+
+const PERM_PAGES = ['dashboard','issues','kanban','gantt','workstreams','settings'];
+const PERM_ROLES = ['admin','pm','dev','viewer'];
+const DEFAULT_PERMISSIONS = {
+  admin:   { dashboard:{view:true,interact:true}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:true}, workstreams:{view:true,interact:true}, settings:{view:true,interact:true} },
+  pm:      { dashboard:{view:true,interact:true}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:true}, workstreams:{view:true,interact:true}, settings:{view:true,interact:false} },
+  dev:     { dashboard:{view:true,interact:false}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:false}, workstreams:{view:true,interact:false}, settings:{view:false,interact:false} },
+  viewer:  { dashboard:{view:true,interact:false}, issues:{view:true,interact:false}, kanban:{view:true,interact:false}, gantt:{view:true,interact:false}, workstreams:{view:true,interact:false}, settings:{view:false,interact:false} },
+};
+function initPermissions() {
+  if (DB.permissions) return;
+  try {
+    const saved = localStorage.getItem('flowdesk_permissions');
+    if (saved) { DB.permissions = JSON.parse(saved); return; }
+  } catch(_) {}
+  DB.permissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
+}
+function can(action, page) {
+  // action: 'view' | 'interact'
+  if (!currentUser || !DB.permissions) return false;
+  const role = currentUser.role;
+  return !!(DB.permissions[role]?.[page]?.[action]);
+}
+function canEditIssue(issue) {
+  if (!currentUser) return false;
+  if (currentUser.role === 'viewer') return false;
+  if (!can('interact','issues')) return false;
+  if (currentUser.role === 'admin' || currentUser.role === 'pm') return true;
+  // Devs and others can only edit issues they created
+  return issue && issue.createdBy === currentUser.id;
+}
 
 // ====== SEED SAMPLE ISSUES ======
 function seedIssues() {
+  if (appSeeded || DB.issues.length) return; // fix: never seed twice
+  appSeeded = true;
   const titles = [
     'Fix login page redirect on mobile', 'Implement OAuth2 integration', 'Database query optimization',
     'Design onboarding flow', 'API rate limiting middleware', 'Fix CSV export encoding',
@@ -820,6 +857,8 @@ function seedIssues() {
         { text: 'Implementation', done: false },
         { text: 'Write tests', done: false }
       ],
+      createdBy: DB.users[i % DB.users.length].id,
+      createdByName: DB.users[i % DB.users.length].name,
       created: new Date().toISOString()
     });
   });
