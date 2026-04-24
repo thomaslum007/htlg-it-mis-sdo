@@ -913,8 +913,11 @@ function nav(page, el) {
 
 // ====== INIT ======
 function initApp() {
+  initPermissions();
   seedIssues();
+  buildFilterUI();
   populateFilters();
+  applyRoleVisibility();
   renderDashboard();
   updateOpenCount();
 }
@@ -974,15 +977,27 @@ function renderActivity() {
   const feed = document.getElementById('activityFeed');
   const items = [...DB.activity].reverse().slice(0, 8);
   if (!items.length) { feed.innerHTML = '<div class="empty"><div class="empty-sub">No activity yet. Create an issue to get started.</div></div>'; return; }
-  feed.innerHTML = items.map(a => `
+  feed.innerHTML = items.map(a => {
+    const who = a.userName || 'System';
+    const initial = who[0] || '?';
+    return `
     <div class="activity-item">
-      <div class="activity-dot"></div>
-      <div><div class="activity-text">${a.text}</div><div class="activity-time">${a.time}</div></div>
-    </div>`).join('');
+      <div class="activity-user-avatar" title="${escapeHtml(who)}">${escapeHtml(initial)}</div>
+      <div>
+        <div class="activity-text"><span class="activity-user">${escapeHtml(who)}</span> ${escapeHtml(a.text)}</div>
+        <div class="activity-time">${escapeHtml(a.time)}</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function logActivity(text) {
-  DB.activity.push({ text, time: new Date().toLocaleTimeString() + ' ' + new Date().toLocaleDateString() });
+  DB.activity.push({
+    text,
+    userId: currentUser?.id || null,
+    userName: currentUser?.name || 'System',
+    time: new Date().toLocaleTimeString() + ' ' + new Date().toLocaleDateString()
+  });
 }
 
 // ====== ISSUES ======
