@@ -37,8 +37,23 @@
   --font: 'DM Sans', sans-serif;
   --mono: 'DM Mono', monospace;
 }
+/* Light theme overrides */
+body.theme-light {
+  --bg: #f5f6fa;
+  --surface: #ffffff;
+  --surface2: #f0f1f6;
+  --surface3: #e4e6ee;
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.14);
+  --text: #1a1a25;
+  --text2: #4a4a60;
+  --text3: #7a7a90;
+  --accent-glow: rgba(108,99,255,0.12);
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; display: flex; font-size: 14px; }
+/* When showing only login, take full width so flex centering works */
+body.login-mode { display: block; }
 
 /* Sidebar */
 .sidebar { width: var(--sidebar-w); background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; height: 100vh; z-index: 100; }
