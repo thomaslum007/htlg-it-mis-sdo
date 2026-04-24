@@ -1046,7 +1046,7 @@ function openNewIssue() {
   document.getElementById('issueDesc').value = '';
   document.getElementById('issueStart').value = fmtDate(new Date());
   document.getElementById('issueEnd').value = '';
-  document.getElementById('checklistItems').innerHTML = '';
+  renderChecklist([]);
   populateIssueDropdowns();
   document.getElementById('issueModal').classList.remove('hidden');
 }
@@ -1452,7 +1452,10 @@ function exportExcel() {
     ID: i.id, Title: i.title, Type: i.type, Status: i.status, Priority: i.priority,
     Assignee: i.assignee||'', Workstream: i.workstream||'', Labels: (i.labels||[]).join(', '),
     StartDate: i.start||'', EndDate: i.end||'', Description: i.desc||'',
-    ChecklistTotal: (i.checklist||[]).length, ChecklistDone: (i.checklist||[]).filter(c=>c.done).length
+    ChecklistTotal: (i.checklist||[]).length,
+    ChecklistDone: (i.checklist||[]).filter(c=>c.done).length,
+    // Serialize full checklist so import can restore items + tick state
+    Checklist: JSON.stringify(i.checklist || [])
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
@@ -1473,11 +1476,18 @@ function importExcel(input) {
       rows.forEach(row => {
         if (!row.Title) return;
         const existing = row.ID ? DB.issues.find(i=>i.id===parseInt(row.ID)) : null;
+        let checklist = [];
+        if (row.Checklist) {
+          try {
+            const parsed = JSON.parse(row.Checklist);
+            if (Array.isArray(parsed)) checklist = parsed.map(c => ({ text: String(c.text||''), done: !!c.done })).filter(c=>c.text);
+          } catch(_) {}
+        }
         const issue = {
           title: row.Title, type: row.Type||'Task', status: row.Status||'To Do',
           priority: row.Priority||'Medium', assignee: row.Assignee||'',
           workstream: row.Workstream||'', labels: row.Labels?row.Labels.split(',').map(l=>l.trim()):[],
-          start: row.StartDate||'', end: row.EndDate||'', desc: row.Description||'', checklist: [], created: new Date().toISOString()
+          start: row.StartDate||'', end: row.EndDate||'', desc: row.Description||'', checklist, created: new Date().toISOString()
         };
         if (existing) { Object.assign(existing, issue); }
         else { DB.issues.push({id:DB.nextIssueId++,...issue}); imported++; }
