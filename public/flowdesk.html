@@ -1605,6 +1605,82 @@ function deleteUser(id) {
   renderUsers(); toast('User deleted','info');
 }
 
+// ====== ROLES & PERMISSIONS ======
+const PAGE_LABELS = { dashboard:'Dashboard', issues:'Issues', kanban:'Kanban', gantt:'Gantt', workstreams:'Workstreams', settings:'Settings' };
+const ROLE_LABELS = { admin:'Admin', pm:'Project Manager', dev:'Developer', viewer:'Viewer' };
+
+function renderPermissions() {
+  initPermissions();
+  const table = document.getElementById('permTable');
+  if (!table) return;
+  const isAdmin = currentUser?.role === 'admin';
+  const saveBtn = document.getElementById('savePermBtn');
+  if (saveBtn) saveBtn.style.display = isAdmin ? '' : 'none';
+  let html = '<thead><tr><th>Tab / Page</th>';
+  PERM_ROLES.forEach(r => { html += `<th>${ROLE_LABELS[r]}</th>`; });
+  html += '</tr></thead><tbody>';
+  PERM_PAGES.forEach(page => {
+    html += `<tr><td><b>${PAGE_LABELS[page]}</b></td>`;
+    PERM_ROLES.forEach(role => {
+      const p = DB.permissions[role][page];
+      // Viewer locked out of certain interacts (cannot edit kanban / users)
+      const viewerLockInteract = (role === 'viewer' && (page === 'kanban' || page === 'settings'));
+      const adminLock = (role === 'admin'); // Admin always full
+      const dis = isAdmin && !adminLock && !viewerLockInteract ? '' : 'disabled';
+      const disV = isAdmin && !adminLock ? '' : 'disabled';
+      html += `<td><div class="perm-cell">
+        <label><input type="checkbox" ${p.view?'checked':''} ${disV} onchange="updatePerm('${role}','${page}','view',this.checked)">View</label>
+        <label><input type="checkbox" ${p.interact?'checked':''} ${dis} onchange="updatePerm('${role}','${page}','interact',this.checked)">Interact</label>
+      </div></td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+function updatePerm(role, page, action, val) {
+  if (currentUser?.role !== 'admin') return;
+  if (role === 'admin') return; // Admin always full
+  if (!DB.permissions[role][page]) DB.permissions[role][page] = { view:false, interact:false };
+  DB.permissions[role][page][action] = !!val;
+  // Cannot interact without viewing
+  if (action === 'view' && !val) DB.permissions[role][page].interact = false;
+  if (action === 'interact' && val) DB.permissions[role][page].view = true;
+  renderPermissions();
+}
+
+function savePermissions() {
+  if (currentUser?.role !== 'admin') { toast('Only admins can change permissions.', 'error'); return; }
+  try { localStorage.setItem('flowdesk_permissions', JSON.stringify(DB.permissions)); } catch(_) {}
+  applyRoleVisibility();
+  toast('Permissions saved', 'success');
+}
+
+function resetPermissions() {
+  if (currentUser?.role !== 'admin') return;
+  if (!confirm('Reset all role permissions to defaults?')) return;
+  DB.permissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
+  try { localStorage.setItem('flowdesk_permissions', JSON.stringify(DB.permissions)); } catch(_) {}
+  applyRoleVisibility();
+  renderPermissions();
+  toast('Permissions reset', 'info');
+}
+
+// Hide nav items for pages the current user cannot view
+function applyRoleVisibility() {
+  const navMap = { dashboard:0, issues:1, kanban:2, gantt:3, workstreams:4, settings:5 };
+  const items = document.querySelectorAll('.sidebar .nav-item');
+  Object.entries(navMap).forEach(([page, idx]) => {
+    const item = items[idx];
+    if (!item) return;
+    item.style.display = can('view', page) ? '' : 'none';
+  });
+  // Hide "+ New Issue" if no interact on issues
+  const newBtn = document.querySelector('.topbar .btn-primary');
+  if (newBtn) newBtn.style.display = can('interact','issues') ? '' : 'none';
+}
+
 // ====== EXCEL IMPORT/EXPORT ======
 function exportExcel() {
   const rows = DB.issues.map(i => ({
