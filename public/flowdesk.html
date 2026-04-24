@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlowDesk — Project Management Suite</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #0f0f13;
+  --surface: #17171e;
+  --surface2: #1e1e28;
+  --surface3: #252530;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --text: #e8e8f0;
+  --text2: #9090a8;
+  --text3: #5a5a72;
+  --accent: #6c63ff;
+  --accent2: #8b83ff;
+  --accent-glow: rgba(108,99,255,0.18);
+  --green: #22c55e;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --blue: #3b82f6;
+  --teal: #14b8a6;
+  --pink: #ec4899;
+  --orange: #f97316;
+  --critical: #ff4d4d;
+  --high: #ff8c42;
+  --medium: #ffd166;
+  --low: #06d6a0;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --sidebar-w: 220px;
+  --font: 'DM Sans', sans-serif;
+  --mono: 'DM Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; display: flex; font-size: 14px; }
+
+/* Sidebar */
+.sidebar { width: var(--sidebar-w); background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; height: 100vh; z-index: 100; }
+.logo { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); }
+.logo-mark { display: flex; align-items: center; gap: 10px; }
+.logo-icon { width: 32px; height: 32px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.logo-text { font-size: 16px; font-weight: 600; letter-spacing: -0.3px; }
+.logo-sub { font-size: 10px; color: var(--text3); font-family: var(--mono); margin-top: 1px; }
+.nav { padding: 12px 10px; flex: 1; overflow-y: auto; }
+.nav-section { margin-bottom: 20px; }
+.nav-label { font-size: 10px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; padding: 0 8px; margin-bottom: 4px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius); cursor: pointer; color: var(--text2); font-size: 13px; font-weight: 400; transition: all 0.15s; border: none; background: none; width: 100%; text-align: left; }
+.nav-item:hover { background: var(--surface2); color: var(--text); }
+.nav-item.active { background: var(--accent-glow); color: var(--accent2); }
+.nav-item .icon { width: 18px; text-align: center; font-size: 15px; flex-shrink: 0; }
+.nav-badge { margin-left: auto; background: var(--accent); color: white; font-size: 10px; border-radius: 10px; padding: 1px 6px; font-family: var(--mono); }
+.sidebar-footer { padding: 12px; border-top: 1px solid var(--border); }
+.user-card { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: var(--radius); cursor: pointer; }
+.user-card:hover { background: var(--surface2); }
+.avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.user-info { flex: 1; min-width: 0; }
+.user-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-role { font-size: 10px; color: var(--text3); font-family: var(--mono); }
+
+/* Main */
+.main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+.topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+.topbar-left { display: flex; align-items: center; gap: 16px; }
+.page-title { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; font-family: var(--font); }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border2); }
+.btn-ghost:hover { background: var(--surface2); color: var(--text); }
+.btn-danger { background: transparent; color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+.btn-danger:hover { background: rgba(239,68,68,0.1); }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-icon { padding: 7px; width: 34px; justify-content: center; }
+.content { padding: 24px; flex: 1; }
+.page { display: none; }
+.page.active { display: block; }
+
+/* Cards */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; }
+.card-sm { padding: 14px 16px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
+
+/* Badges / Status */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; font-family: var(--mono); white-space: nowrap; }
+.badge-todo { background: rgba(144,144,168,0.15); color: var(--text2); }
+.badge-inprogress { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.badge-review { background: rgba(245,158,11,0.15); color: #fbbf24; }
+.badge-done { background: rgba(34,197,94,0.15); color: #4ade80; }
+.badge-blocked { background: rgba(239,68,68,0.15); color: #f87171; }
+.badge-critical { background: rgba(255,77,77,0.15); color: var(--critical); }
+.badge-high { background: rgba(255,140,66,0.15); color: var(--high); }
+.badge-medium { background: rgba(255,209,102,0.15); color: var(--medium); }
+.badge-low { background: rgba(6,214,160,0.15); color: var(--low); }
+.badge-bug { background: rgba(239,68,68,0.12); color: #f87171; }
+.badge-feature { background: rgba(108,99,255,0.15); color: var(--accent2); }
+.badge-task { background: rgba(20,184,166,0.12); color: #2dd4bf; }
+.badge-epic { background: rgba(236,72,153,0.12); color: #f472b6; }
+.badge-story { background: rgba(249,115,22,0.12); color: #fb923c; }
+
+/* Priority dot */
+.prio-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.prio-critical { background: var(--critical); }
+.prio-high { background: var(--high); }
+.prio-medium { background: var(--medium); }
+.prio-low { background: var(--low); }
+
+/* Table */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 10px 12px; color: var(--text3); font-size: 11px; font-family: var(--mono); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--surface2); }
+tr { cursor: pointer; }
+
+/* Forms */
+.form-group { margin-bottom: 16px; }
+label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 6px; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.4px; }
+input[type=text], input[type=password], input[type=date], input[type=email], select, textarea {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius);
+  color: var(--text); font-family: var(--font); font-size: 13px; padding: 9px 12px; outline: none; transition: border 0.15s;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+select option { background: var(--surface2); }
+textarea { resize: vertical; min-height: 80px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+/* Modal */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
+.modal-overlay.hidden { display: none; }
+.modal { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius-lg); padding: 0; width: 100%; max-width: 680px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+.modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.modal-title { font-size: 16px; font-weight: 600; }
+.modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+.modal-footer { padding: 14px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+.close-btn { background: none; border: none; color: var(--text3); font-size: 18px; cursor: pointer; padding: 4px; border-radius: 4px; line-height: 1; }
+.close-btn:hover { color: var(--text); background: var(--surface3); }
+
+/* Kanban */
+.kanban-board { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 16px; min-height: 600px; }
+.kanban-col { min-width: 260px; max-width: 260px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); display: flex; flex-direction: column; }
+.kanban-col-header { padding: 14px 14px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.kanban-col-title { font-size: 12px; font-weight: 600; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.6px; }
+.kanban-col-count { background: var(--surface3); color: var(--text3); font-size: 10px; padding: 2px 6px; border-radius: 10px; font-family: var(--mono); margin-left: auto; }
+.kanban-cards { padding: 10px; flex: 1; min-height: 100px; }
+.kanban-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 8px; cursor: grab; transition: all 0.15s; }
+.kanban-card:hover { border-color: var(--border2); transform: translateY(-1px); }
+.kanban-card.dragging { opacity: 0.4; transform: rotate(2deg); }
+.kanban-col.drag-over { background: var(--accent-glow); border-color: var(--accent); }
+.kanban-card-title { font-size: 13px; font-weight: 500; margin-bottom: 8px; line-height: 1.4; }
+.kanban-card-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.kanban-card-id { font-size: 10px; color: var(--text3); font-family: var(--mono); }
+
+/* Gantt */
+.gantt-wrap { overflow-x: auto; }
+.gantt-container { display: grid; min-width: 900px; }
+.gantt-header { display: flex; background: var(--surface2); border-bottom: 1px solid var(--border); }
+.gantt-label-col { width: 240px; flex-shrink: 0; padding: 10px 14px; font-size: 11px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; border-right: 1px solid var(--border); }
+.gantt-timeline { flex: 1; display: flex; position: relative; }
+.gantt-month { flex: 1; text-align: center; padding: 10px 4px; font-size: 11px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; border-right: 1px solid var(--border); }
+.gantt-row { display: flex; border-bottom: 1px solid var(--border); align-items: center; min-height: 44px; position: relative; }
+.gantt-row:hover { background: var(--surface2); }
+.gantt-row-label { width: 240px; flex-shrink: 0; padding: 10px 14px; font-size: 13px; border-right: 1px solid var(--border); display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gantt-track { flex: 1; position: relative; height: 44px; }
+.gantt-bar { position: absolute; top: 50%; transform: translateY(-50%); height: 24px; border-radius: 4px; cursor: pointer; transition: opacity 0.15s; display: flex; align-items: center; padding: 0 8px; font-size: 11px; color: white; font-weight: 500; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.gantt-bar:hover { opacity: 0.85; }
+.gantt-tooltip { position: fixed; background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); padding: 10px 12px; font-size: 12px; pointer-events: none; z-index: 999; max-width: 240px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); display: none; }
+.gantt-tooltip.visible { display: block; }
+.gantt-tooltip-title { font-weight: 600; margin-bottom: 4px; font-size: 13px; }
+.gantt-tooltip-row { color: var(--text2); margin-top: 2px; }
+
+/* Dashboard stats */
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; }
+.stat-num { font-size: 32px; font-weight: 600; font-family: var(--mono); letter-spacing: -1px; }
+.stat-label { font-size: 12px; color: var(--text3); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+.stat-change { font-size: 12px; margin-top: 6px; font-family: var(--mono); }
+.stat-change.up { color: var(--green); }
+.stat-change.down { color: var(--red); }
+
+/* Activity feed */
+.activity-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.activity-item:last-child { border-bottom: none; }
+.activity-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; margin-top: 5px; }
+.activity-text { font-size: 13px; line-height: 1.5; }
+.activity-time { font-size: 11px; color: var(--text3); font-family: var(--mono); margin-top: 2px; }
+
+/* Settings */
+.settings-section { margin-bottom: 32px; }
+.settings-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.settings-desc { font-size: 13px; color: var(--text2); margin-bottom: 16px; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.tag-item { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; background: var(--surface2); border: 1px solid var(--border); font-size: 12px; font-family: var(--mono); }
+.tag-remove { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 14px; padding: 0; line-height: 1; display: flex; }
+.tag-remove:hover { color: var(--red); }
+.tag-add-row { display: flex; gap: 8px; }
+.tag-add-row input { flex: 1; }
+
+/* Checklist */
+.checklist { margin-top: 8px; }
+.check-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.check-item:last-child { border-bottom: none; }
+.check-item input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
+.check-item-text { flex: 1; font-size: 13px; }
+.check-item-text.done { text-decoration: line-through; color: var(--text3); }
+.check-item-remove { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 13px; padding: 2px 4px; border-radius: 4px; }
+.check-item-remove:hover { color: var(--red); }
+.check-add-row { display: flex; gap: 8px; margin-top: 8px; }
+.check-add-row input { flex: 1; }
+
+/* User table */
+.role-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-family: var(--mono); }
+.role-admin { background: rgba(108,99,255,0.18); color: var(--accent2); }
+.role-pm { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.role-dev { background: rgba(34,197,94,0.15); color: #4ade80; }
+.role-viewer { background: rgba(144,144,168,0.12); color: var(--text3); }
+
+/* Login */
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); }
+.login-box { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius-lg); padding: 40px; width: 100%; max-width: 400px; }
+.login-logo { text-align: center; margin-bottom: 32px; }
+.login-title { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+.login-sub { font-size: 13px; color: var(--text3); }
+.login-error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #f87171; padding: 10px 12px; border-radius: var(--radius); font-size: 13px; margin-bottom: 16px; display: none; }
+
+/* Tabs */
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.tab { padding: 10px 16px; cursor: pointer; font-size: 13px; color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
+
+/* Search */
+.search-input { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-family: var(--font); font-size: 13px; padding: 7px 12px; outline: none; transition: border 0.15s; width: 220px; }
+.search-input:focus { border-color: var(--accent); }
+
+/* Workstream */
+.ws-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; }
+.ws-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.ws-name { font-size: 15px; font-weight: 600; }
+.ws-team { display: flex; gap: -6px; margin-top: 8px; }
+.ws-member { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; border: 2px solid var(--surface); }
+.progress-bar { height: 4px; background: var(--surface3); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
+
+/* Section headers */
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.section-title { font-size: 15px; font-weight: 600; }
+
+/* Toast */
+.toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+.toast { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); padding: 12px 16px; font-size: 13px; max-width: 300px; animation: slideIn 0.2s ease; box-shadow: 0 8px 32px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 10px; }
+.toast.success { border-left: 3px solid var(--green); }
+.toast.error { border-left: 3px solid var(--red); }
+.toast.info { border-left: 3px solid var(--accent); }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* Divider */
+.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+/* Empty state */
+.empty { text-align: center; padding: 60px 20px; color: var(--text3); }
+.empty-icon { font-size: 40px; margin-bottom: 12px; }
+.empty-title { font-size: 15px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+.empty-sub { font-size: 13px; }
+
+/* Responsive */
+@media(max-width: 768px) {
+  .sidebar { transform: translateX(-100%); }
+  .main { margin-left: 0; }
+  .grid-4 { grid-template-columns: 1fr 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+}
+.hidden { display: none !important; }
+.flex { display: flex; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.mb-4 { margin-bottom: 16px; }
+.mb-3 { margin-bottom: 12px; }
+.text-sm { font-size: 12px; }
+.text-muted { color: var(--text2); }
+.fw-500 { font-weight: 500; }
+.mono { font-family: var(--mono); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginPage" class="login-wrap">
+  <div class="login-box">
+    <div class="login-logo">
+      <div style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;background:var(--accent);border-radius:12px;font-size:24px;margin-bottom:12px;">⚡</div>
+      <div class="login-title">FlowDesk</div>
+      <div class="login-sub">Project Management Suite</div>
+    </div>
+    <div class="login-error" id="loginError">Invalid username or password.</div>
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" id="loginUser" placeholder="Enter username" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="loginPass" placeholder="Enter password">
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px;" onclick="doLogin()">Sign In</button>
+    <div style="margin-top:16px;font-size:12px;color:var(--text3);text-align:center;">Default: admin / admin123</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden" style="display:flex;width:100%;min-height:100vh;">
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">
+      <div class="logo-icon">⚡</div>
+      <div>
+        <div class="logo-text">FlowDesk</div>
+        <div class="logo-sub">v2.0 PRO</div>
+      </div>
+    </div>
+  </div>
+  <div class="nav">
+    <div class="nav-section">
+      <div class="nav-label">Overview</div>
+      <button class="nav-item active" onclick="nav('dashboard',this)"><span class="icon">📊</span>Dashboard</button>
+      <button class="nav-item" onclick="nav('issues',this)"><span class="icon">🗂</span>Issues <span class="nav-badge" id="openCount">0</span></button>
+      <button class="nav-item" onclick="nav('kanban',this)"><span class="icon">📋</span>Kanban</button>
+      <button class="nav-item" onclick="nav('gantt',this)"><span class="icon">📅</span>Gantt Chart</button>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Team</div>
+      <button class="nav-item" onclick="nav('workstreams',this)"><span class="icon">🏗</span>Workstreams</button>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Config</div>
+      <button class="nav-item" onclick="nav('settings',this)"><span class="icon">⚙️</span>Settings</button>
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    <div class="user-card" onclick="nav('settings',document.querySelector('.nav-item:last-child'))">
+      <div class="avatar" id="sidebarAvatar" style="background:var(--accent);">A</div>
+      <div class="user-info">
+        <div class="user-name" id="sidebarUsername">Admin</div>
+        <div class="user-role" id="sidebarRole">Administrator</div>
+      </div>
+    </div>
+    <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px;justify-content:center;" onclick="doLogout()">Sign Out</button>
+  </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="page-title" id="pageTitle">Dashboard</div>
+    </div>
+    <div class="topbar-right">
+      <input class="search-input" id="globalSearch" placeholder="🔍  Search issues..." oninput="globalSearchHandler(this.value)">
+      <button class="btn btn-primary" onclick="openNewIssue()">+ New Issue</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportExcel()" title="Export Excel">📤 Export</button>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importFile').click()" title="Import Excel">📥 Import</button>
+      <input type="file" id="importFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importExcel(this)">
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="content page active" id="page-dashboard">
+    <div class="grid-4 mb-4" id="statCards"></div>
+    <div class="grid-2" style="gap:20px;">
+      <div class="card">
+        <div class="section-header"><div class="section-title">Issues by Status</div></div>
+        <canvas id="statusChart" height="180"></canvas>
+      </div>
+      <div class="card">
+        <div class="section-header"><div class="section-title">Priority Distribution</div></div>
+        <canvas id="priorityChart" height="180"></canvas>
+      </div>
+    </div>
+    <div class="card" style="margin-top:20px;">
+      <div class="section-header"><div class="section-title">Recent Activity</div></div>
+      <div id="activityFeed"></div>
+    </div>
+  </div>
+
+  <!-- ISSUES -->
+  <div class="content page hidden" id="page-issues">
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+      <select id="filterStatus" onchange="renderIssues()" style="width:auto;"><option value="">All Statuses</option></select>
+      <select id="filterPriority" onchange="renderIssues()" style="width:auto;"><option value="">All Priorities</option></select>
+      <select id="filterType" onchange="renderIssues()" style="width:auto;"><option value="">All Types</option></select>
+      <select id="filterAssignee" onchange="renderIssues()" style="width:auto;"><option value="">All Assignees</option></select>
+      <select id="filterWorkstream" onchange="renderIssues()" style="width:auto;"><option value="">All Workstreams</option></select>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div class="table-wrap">
+        <table id="issuesTable">
+          <thead>
+            <tr>
+              <th>ID</th><th>Title</th><th>Type</th><th>Status</th><th>Priority</th>
+              <th>Assignee</th><th>Workstream</th><th>Start</th><th>End</th><th>Labels</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="issuesTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- KANBAN -->
+  <div class="content page hidden" id="page-kanban">
+    <div class="kanban-board" id="kanbanBoard"></div>
+  </div>
+
+  <!-- GANTT -->
+  <div class="content page hidden" id="page-gantt">
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div class="gantt-wrap" id="ganttWrap"></div>
+    </div>
+    <div class="gantt-tooltip" id="ganttTooltip"></div>
+  </div>
+
+  <!-- WORKSTREAMS -->
+  <div class="content page hidden" id="page-workstreams">
+    <div class="section-header">
+      <div class="section-title">Department Workstreams</div>
+      <button class="btn btn-primary" onclick="openWorkstreamModal()">+ New Workstream</button>
+    </div>
+    <div id="workstreamList"></div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="content page hidden" id="page-settings">
+    <div class="tabs">
+      <div class="tab active" onclick="settingsTab('general',this)">General</div>
+      <div class="tab" onclick="settingsTab('labels',this)">Labels</div>
+      <div class="tab" onclick="settingsTab('statuses',this)">Statuses</div>
+      <div class="tab" onclick="settingsTab('users',this)">Users</div>
+    </div>
+    <div id="settings-general" class="settings-content">
+      <div class="settings-section">
+        <div class="settings-title">Issue Types</div>
+        <div class="settings-desc">Manage the available issue types for your project.</div>
+        <div class="tag-list" id="typeList"></div>
+        <div class="tag-add-row">
+          <input type="text" id="newType" placeholder="Add type..." style="width:200px;">
+          <input type="color" id="typeColor" value="#6c63ff" style="width:40px;height:36px;padding:2px;cursor:pointer;border-radius:var(--radius);">
+          <button class="btn btn-primary btn-sm" onclick="addType()">Add</button>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-title">Priority Levels</div>
+        <div class="settings-desc">Manage priority levels (drag to reorder).</div>
+        <div class="tag-list" id="priorityList"></div>
+      </div>
+    </div>
+    <div id="settings-labels" class="settings-content hidden">
+      <div class="settings-section">
+        <div class="settings-title">Issue Labels</div>
+        <div class="settings-desc">Create labels to categorize issues. Labels can be applied to any issue.</div>
+        <div class="tag-list" id="labelList"></div>
+        <div class="tag-add-row">
+          <input type="text" id="newLabel" placeholder="Label name...">
+          <input type="color" id="labelColor" value="#6c63ff" style="width:40px;height:36px;padding:2px;cursor:pointer;border-radius:var(--radius);">
+          <button class="btn btn-primary btn-sm" onclick="addLabel()">Add Label</button>
+        </div>
+      </div>
+    </div>
+    <div id="settings-statuses" class="settings-content hidden">
+      <div class="settings-section">
+        <div class="settings-title">Workflow Statuses</div>
+        <div class="settings-desc">Manage the statuses that define your issue workflow.</div>
+        <div class="tag-list" id="statusList"></div>
+        <div class="tag-add-row">
+          <input type="text" id="newStatus" placeholder="Status name...">
+          <input type="color" id="statusColor" value="#6c63ff" style="width:40px;height:36px;padding:2px;cursor:pointer;border-radius:var(--radius);">
+          <button class="btn btn-primary btn-sm" onclick="addStatus()">Add Status</button>
+        </div>
+      </div>
+    </div>
+    <div id="settings-users" class="settings-content hidden">
+      <div class="section-header">
+        <div class="settings-title">Team Members</div>
+        <button class="btn btn-primary btn-sm" onclick="openUserModal()">+ Add User</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="table-wrap">
+          <table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Department</th><th>Actions</th></tr></thead>
+          <tbody id="usersTbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ISSUE MODAL -->
+<div class="modal-overlay hidden" id="issueModal">
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-header">
+      <div class="modal-title" id="issueModalTitle">New Issue</div>
+      <button class="close-btn" onclick="closeModal('issueModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="issueId">
+      <div class="form-group">
+        <label>Issue Title *</label>
+        <input type="text" id="issueTitle" placeholder="Describe the issue clearly...">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Issue Type</label>
+          <select id="issueType"></select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="issueStatus"></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Priority</label>
+          <select id="issuePriority"></select>
+        </div>
+        <div class="form-group">
+          <label>Assignee</label>
+          <select id="issueAssignee"></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Workstream</label>
+          <select id="issueWorkstream"></select>
+        </div>
+        <div class="form-group">
+          <label>Labels</label>
+          <select id="issueLabels" multiple style="height:70px;"></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Start Date</label>
+          <input type="date" id="issueStart">
+        </div>
+        <div class="form-group">
+          <label>End Date</label>
+          <input type="date" id="issueEnd">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea id="issueDesc" rows="4" placeholder="Detailed description, acceptance criteria, steps to reproduce..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Checklist</label>
+        <div class="checklist" id="checklistItems"></div>
+        <div class="check-add-row">
+          <input type="text" id="newCheckItem" placeholder="Add checklist item...">
+          <button class="btn btn-ghost btn-sm" onclick="addCheckItem()">+ Add</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('issueModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveIssue()">Save Issue</button>
+    </div>
+  </div>
+</div>
+
+<!-- USER MODAL -->
+<div class="modal-overlay hidden" id="userModal">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title" id="userModalTitle">Add User</div>
+      <button class="close-btn" onclick="closeModal('userModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="userId">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="userName">
+        </div>
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="userUsername">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="userEmail">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="userPassword" placeholder="Leave blank to keep existing">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Role</label>
+          <select id="userRole">
+            <option value="admin">Admin</option>
+            <option value="pm" selected>Project Manager</option>
+            <option value="dev">Developer</option>
+            <option value="viewer">Viewer</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Department</label>
+          <input type="text" id="userDept" placeholder="e.g. Engineering">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Responsibilities</label>
+        <textarea id="userResponsibilities" rows="3" placeholder="Brief description of roles and responsibilities..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('userModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveUser()">Save User</button>
+    </div>
+  </div>
+</div>
+
+<!-- WORKSTREAM MODAL -->
+<div class="modal-overlay hidden" id="workstreamModal">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title" id="wsModalTitle">New Workstream</div>
+      <button class="close-btn" onclick="closeModal('workstreamModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="wsId">
+      <div class="form-group">
+        <label>Workstream Name</label>
+        <input type="text" id="wsName" placeholder="e.g. Frontend Development">
+      </div>
+      <div class="form-group">
+        <label>Department</label>
+        <input type="text" id="wsDept" placeholder="e.g. Engineering">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea id="wsDesc" rows="3" placeholder="What does this workstream focus on?"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Color</label>
+        <input type="color" id="wsColor" value="#6c63ff" style="width:60px;height:36px;padding:2px;cursor:pointer;border-radius:var(--radius);">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('workstreamModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveWorkstream()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+// ===================== DATA STORE =====================
+let DB = {
+  issues: [],
+  users: [
+    { id: 1, name: 'Alice Admin', username: 'admin', password: 'admin123', email: 'alice@company.com', role: 'admin', dept: 'Management', responsibilities: 'Full system access, user management' },
+    { id: 2, name: 'Bob PM', username: 'bob', password: 'bob123', email: 'bob@company.com', role: 'pm', dept: 'Product', responsibilities: 'Sprint planning, backlog grooming' },
+    { id: 3, name: 'Carol Dev', username: 'carol', password: 'carol123', email: 'carol@company.com', role: 'dev', dept: 'Engineering', responsibilities: 'Frontend development, code reviews' },
+    { id: 4, name: 'Dave Dev', username: 'dave', password: 'dave123', email: 'dave@company.com', role: 'dev', dept: 'Engineering', responsibilities: 'Backend development, DevOps' },
+  ],
+  workstreams: [
+    { id: 1, name: 'Frontend', dept: 'Engineering', desc: 'UI/UX development and web components', color: '#6c63ff' },
+    { id: 2, name: 'Backend API', dept: 'Engineering', desc: 'Server, database and API development', color: '#14b8a6' },
+    { id: 3, name: 'Product Design', dept: 'Product', desc: 'User research, wireframes, prototypes', color: '#ec4899' },
+    { id: 4, name: 'DevOps', dept: 'Infrastructure', desc: 'CI/CD, deployments, monitoring', color: '#f59e0b' },
+  ],
+  labels: [
+    { name: 'UI', color: '#6c63ff' },
+    { name: 'API', color: '#14b8a6' },
+    { name: 'Database', color: '#f59e0b' },
+    { name: 'Security', color: '#ef4444' },
+    { name: 'Performance', color: '#22c55e' },
+    { name: 'Mobile', color: '#3b82f6' },
+  ],
+  statuses: [
+    { name: 'To Do', color: '#9090a8' },
+    { name: 'In Progress', color: '#3b82f6' },
+    { name: 'In Review', color: '#f59e0b' },
+    { name: 'Done', color: '#22c55e' },
+    { name: 'Blocked', color: '#ef4444' },
+  ],
+  types: [
+    { name: 'Bug', color: '#ef4444' },
+    { name: 'Feature', color: '#6c63ff' },
+    { name: 'Task', color: '#14b8a6' },
+    { name: 'Epic', color: '#ec4899' },
+    { name: 'Story', color: '#f97316' },
+  ],
+  priorities: ['Critical', 'High', 'Medium', 'Low'],
+  activity: [],
+  nextIssueId: 1,
+  nextUserId: 5,
+  nextWsId: 5,
+};
+
+let currentUser = null;
+let editingIssueId = null;
+let editingUserId = null;
+let editingWsId = null;
+let chartInstances = {};
+
+// ====== SEED SAMPLE ISSUES ======
+function seedIssues() {
+  const titles = [
+    'Fix login page redirect on mobile', 'Implement OAuth2 integration', 'Database query optimization',
+    'Design onboarding flow', 'API rate limiting middleware', 'Fix CSV export encoding',
+    'Add dark mode toggle', 'User profile page redesign', 'Kubernetes deployment config',
+    'Password reset email template', 'Implement search indexing', 'Fix sidebar z-index bug'
+  ];
+  const today = new Date();
+  titles.forEach((title, i) => {
+    const start = new Date(today); start.setDate(start.getDate() - Math.floor(Math.random()*20));
+    const end = new Date(start); end.setDate(end.getDate() + 5 + Math.floor(Math.random()*20));
+    DB.issues.push({
+      id: DB.nextIssueId++,
+      title,
+      type: DB.types[i % DB.types.length].name,
+      status: DB.statuses[i % DB.statuses.length].name,
+      priority: DB.priorities[i % DB.priorities.length],
+      assignee: DB.users[i % DB.users.length].name,
+      workstream: DB.workstreams[i % DB.workstreams.length].name,
+      labels: [DB.labels[i % DB.labels.length].name],
+      start: fmtDate(start), end: fmtDate(end),
+      desc: 'Sample issue description for testing purposes.',
+      checklist: [
+        { text: 'Review requirements', done: i % 3 === 0 },
+        { text: 'Implementation', done: false },
+        { text: 'Write tests', done: false }
+      ],
+      created: new Date().toISOString()
+    });
+  });
+}
+
+function fmtDate(d) {
+  return d.toISOString().split('T')[0];
+}
+
+// ====== AUTH ======
+function doLogin() {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value.trim();
+  const user = DB.users.find(x => x.username === u && x.password === p);
+  if (!user) { document.getElementById('loginError').style.display = 'block'; return; }
+  currentUser = user;
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('sidebarUsername').textContent = user.name;
+  document.getElementById('sidebarRole').textContent = user.role.toUpperCase();
+  document.getElementById('sidebarAvatar').textContent = user.name[0];
+  initApp();
+}
+function doLogout() {
+  currentUser = null;
+  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginError').style.display = 'none';
+}
+
+// ====== NAVIGATION ======
+function nav(page, el) {
+  document.querySelectorAll('.page').forEach(p => { p.classList.remove('active'); p.classList.add('hidden'); });
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const pg = document.getElementById('page-' + page);
+  if (pg) { pg.classList.remove('hidden'); pg.classList.add('active'); }
+  if (el) el.classList.add('active');
+  const titles = { dashboard:'Dashboard', issues:'Issues', kanban:'Kanban Board', gantt:'Gantt Chart', workstreams:'Workstreams', settings:'Settings' };
+  document.getElementById('pageTitle').textContent = titles[page] || page;
+  if (page === 'dashboard') renderDashboard();
+  if (page === 'issues') renderIssues();
+  if (page === 'kanban') renderKanban();
+  if (page === 'gantt') renderGantt();
+  if (page === 'workstreams') renderWorkstreams();
+  if (page === 'settings') renderSettings();
+}
+
+// ====== INIT ======
+function initApp() {
+  seedIssues();
+  populateFilters();
+  renderDashboard();
+  updateOpenCount();
+}
+
+function updateOpenCount() {
+  const open = DB.issues.filter(i => i.status !== 'Done').length;
+  document.getElementById('openCount').textContent = open;
+}
+
+// ====== DASHBOARD ======
+function renderDashboard() {
+  const total = DB.issues.length;
+  const done = DB.issues.filter(i => i.status === 'Done').length;
+  const inprog = DB.issues.filter(i => i.status === 'In Progress').length;
+  const blocked = DB.issues.filter(i => i.status === 'Blocked').length;
+  const critical = DB.issues.filter(i => i.priority === 'Critical').length;
+  document.getElementById('statCards').innerHTML = `
+    <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">Total Issues</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--blue)">${inprog}</div><div class="stat-label">In Progress</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--green)">${done}</div><div class="stat-label">Completed</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--red)">${blocked + critical}</div><div class="stat-label">Needs Attention</div></div>
+  `;
+  renderStatusChart();
+  renderPriorityChart();
+  renderActivity();
+}
+
+function renderStatusChart() {
+  const ctx = document.getElementById('statusChart');
+  if (!ctx) return;
+  if (chartInstances.status) chartInstances.status.destroy();
+  const counts = DB.statuses.map(s => DB.issues.filter(i => i.status === s.name).length);
+  chartInstances.status = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: DB.statuses.map(s=>s.name), datasets: [{ data: counts, backgroundColor: DB.statuses.map(s=>s.color+'99'), borderColor: DB.statuses.map(s=>s.color), borderWidth: 2 }] },
+    options: { responsive: true, plugins: { legend: { labels: { color: '#9090a8', font: { family: 'DM Mono', size: 11 } } } } }
+  });
+}
+
+function renderPriorityChart() {
+  const ctx = document.getElementById('priorityChart');
+  if (!ctx) return;
+  if (chartInstances.priority) chartInstances.priority.destroy();
+  const colors = { Critical:'#ff4d4d', High:'#ff8c42', Medium:'#ffd166', Low:'#06d6a0' };
+  const counts = DB.priorities.map(p => DB.issues.filter(i => i.priority === p).length);
+  chartInstances.priority = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: DB.priorities, datasets: [{ data: counts, backgroundColor: DB.priorities.map(p=>colors[p]+'88'), borderColor: DB.priorities.map(p=>colors[p]), borderWidth: 2, borderRadius: 4 }] },
+    options: { responsive: true, scales: { y: { ticks: { color:'#9090a8', font:{family:'DM Mono'} }, grid:{color:'rgba(255,255,255,0.05)'} }, x: { ticks: { color:'#9090a8', font:{family:'DM Mono'} }, grid:{color:'transparent'} } }, plugins: { legend:{ display:false } } }
+  });
+}
+
+function renderActivity() {
+  const feed = document.getElementById('activityFeed');
+  const items = [...DB.activity].reverse().slice(0, 8);
+  if (!items.length) { feed.innerHTML = '<div class="empty"><div class="empty-sub">No activity yet. Create an issue to get started.</div></div>'; return; }
+  feed.innerHTML = items.map(a => `
+    <div class="activity-item">
+      <div class="activity-dot"></div>
+      <div><div class="activity-text">${a.text}</div><div class="activity-time">${a.time}</div></div>
+    </div>`).join('');
+}
+
+function logActivity(text) {
+  DB.activity.push({ text, time: new Date().toLocaleTimeString() + ' ' + new Date().toLocaleDateString() });
+}
+
+// ====== ISSUES ======
+function populateFilters() {
+  const fs = { filterStatus: DB.statuses.map(s=>s.name), filterPriority: DB.priorities, filterType: DB.types.map(t=>t.name) };
+  Object.entries(fs).forEach(([id, opts]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const cur = el.value;
+    el.innerHTML = `<option value="">All</option>` + opts.map(o=>`<option value="${o}">${o}</option>`).join('');
+    el.value = cur;
+  });
+  const fa = document.getElementById('filterAssignee');
+  if (fa) { const cur = fa.value; fa.innerHTML = `<option value="">All Assignees</option>` + DB.users.map(u=>`<option value="${u.name}">${u.name}</option>`).join(''); fa.value = cur; }
+  const fw = document.getElementById('filterWorkstream');
+  if (fw) { const cur = fw.value; fw.innerHTML = `<option value="">All Workstreams</option>` + DB.workstreams.map(w=>`<option value="${w.name}">${w.name}</option>`).join(''); fw.value = cur; }
+}
+
+function getFilteredIssues() {
+  let list = [...DB.issues];
+  const st = document.getElementById('filterStatus')?.value;
+  const pr = document.getElementById('filterPriority')?.value;
+  const ty = document.getElementById('filterType')?.value;
+  const as = document.getElementById('filterAssignee')?.value;
+  const ws = document.getElementById('filterWorkstream')?.value;
+  const gs = document.getElementById('globalSearch')?.value.toLowerCase();
+  if (st) list = list.filter(i => i.status === st);
+  if (pr) list = list.filter(i => i.priority === pr);
+  if (ty) list = list.filter(i => i.type === ty);
+  if (as) list = list.filter(i => i.assignee === as);
+  if (ws) list = list.filter(i => i.workstream === ws);
+  if (gs) list = list.filter(i => i.title.toLowerCase().includes(gs) || (i.desc||'').toLowerCase().includes(gs) || String(i.id).includes(gs));
+  return list;
+}
+
+function renderIssues() {
+  const issues = getFilteredIssues();
+  const tbody = document.getElementById('issuesTbody');
+  if (!tbody) return;
+  if (!issues.length) { tbody.innerHTML = `<tr><td colspan="11"><div class="empty"><div class="empty-icon">🗂</div><div class="empty-title">No issues found</div></div></td></tr>`; return; }
+  tbody.innerHTML = issues.map(i => {
+    const canEdit = currentUser && (currentUser.role === 'admin' || currentUser.role === 'pm');
+    const labels = (i.labels||[]).map(l => { const lb = DB.labels.find(x=>x.name===l); return `<span class="badge" style="background:${(lb?.color||'#6c63ff')}22;color:${lb?.color||'#6c63ff'};margin:1px;">${l}</span>`; }).join('');
+    return `<tr onclick="canEdit && openEditIssue(${i.id})">
+      <td class="mono" style="color:var(--text3);font-size:11px;">#${i.id}</td>
+      <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;">${i.title}</td>
+      <td><span class="badge badge-${i.type.toLowerCase()}">${i.type}</span></td>
+      <td><span class="badge badge-${statusKey(i.status)}">${i.status}</span></td>
+      <td><span class="prio-dot prio-${i.priority.toLowerCase()}" style="margin-right:4px;"></span>${i.priority}</td>
+      <td>${i.assignee||'—'}</td>
+      <td>${i.workstream||'—'}</td>
+      <td class="mono" style="font-size:12px;color:var(--text2);">${i.start||'—'}</td>
+      <td class="mono" style="font-size:12px;color:var(--text2);">${i.end||'—'}</td>
+      <td>${labels||'—'}</td>
+      <td onclick="event.stopPropagation()">
+        <div style="display:flex;gap:4px;">
+          ${canEdit ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="openEditIssue(${i.id})" title="Edit">✏️</button>` : ''}
+          ${currentUser?.role==='admin' ? `<button class="btn btn-danger btn-sm btn-icon" onclick="deleteIssue(${i.id})" title="Delete">🗑</button>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function statusKey(s) {
+  const map = { 'To Do': 'todo', 'In Progress': 'inprogress', 'In Review': 'review', 'Done': 'done', 'Blocked': 'blocked' };
+  return map[s] || 'todo';
+}
+
+function globalSearchHandler(v) { renderIssues(); }
+
+// ====== ISSUE MODAL ======
+function populateIssueDropdowns() {
+  const selType = document.getElementById('issueType');
+  selType.innerHTML = DB.types.map(t=>`<option value="${t.name}">${t.name}</option>`).join('');
+  const selStatus = document.getElementById('issueStatus');
+  selStatus.innerHTML = DB.statuses.map(s=>`<option value="${s.name}">${s.name}</option>`).join('');
+  const selPrio = document.getElementById('issuePriority');
+  selPrio.innerHTML = DB.priorities.map(p=>`<option value="${p}">${p}</option>`).join('');
+  const selAssignee = document.getElementById('issueAssignee');
+  selAssignee.innerHTML = `<option value="">Unassigned</option>` + DB.users.map(u=>`<option value="${u.name}">${u.name}</option>`).join('');
+  const selWs = document.getElementById('issueWorkstream');
+  selWs.innerHTML = `<option value="">None</option>` + DB.workstreams.map(w=>`<option value="${w.name}">${w.name}</option>`).join('');
+  const selLabels = document.getElementById('issueLabels');
+  selLabels.innerHTML = DB.labels.map(l=>`<option value="${l.name}">${l.name}</option>`).join('');
+}
+
+function openNewIssue() {
+  if (currentUser?.role === 'viewer') { toast('You do not have permission to create issues.', 'error'); return; }
+  editingIssueId = null;
+  document.getElementById('issueModalTitle').textContent = 'New Issue';
+  document.getElementById('issueId').value = '';
+  document.getElementById('issueTitle').value = '';
+  document.getElementById('issueDesc').value = '';
+  document.getElementById('issueStart').value = fmtDate(new Date());
+  document.getElementById('issueEnd').value = '';
+  document.getElementById('checklistItems').innerHTML = '';
+  populateIssueDropdowns();
+  document.getElementById('issueModal').classList.remove('hidden');
+}
+
+function openEditIssue(id) {
+  const issue = DB.issues.find(i => i.id === id);
+  if (!issue) return;
+  editingIssueId = id;
+  document.getElementById('issueModalTitle').textContent = 'Edit Issue #' + id;
+  document.getElementById('issueId').value = id;
+  populateIssueDropdowns();
+  document.getElementById('issueTitle').value = issue.title;
+  document.getElementById('issueType').value = issue.type;
+  document.getElementById('issueStatus').value = issue.status;
+  document.getElementById('issuePriority').value = issue.priority;
+  document.getElementById('issueAssignee').value = issue.assignee || '';
+  document.getElementById('issueWorkstream').value = issue.workstream || '';
+  document.getElementById('issueStart').value = issue.start || '';
+  document.getElementById('issueEnd').value = issue.end || '';
+  document.getElementById('issueDesc').value = issue.desc || '';
+  const selLabels = document.getElementById('issueLabels');
+  [...selLabels.options].forEach(o => o.selected = (issue.labels||[]).includes(o.value));
+  renderChecklist(issue.checklist || []);
+  document.getElementById('issueModal').classList.remove('hidden');
+}
+
+function renderChecklist(items) {
+  const el = document.getElementById('checklistItems');
+  el.innerHTML = items.map((c, i) => `
+    <div class="check-item" id="chk-${i}">
+      <input type="checkbox" ${c.done?'checked':''} onchange="toggleCheck(${i})">
+      <span class="check-item-text ${c.done?'done':''}" id="chktext-${i}">${c.text}</span>
+      <button class="check-item-remove" onclick="removeCheck(${i})">✕</button>
+    </div>`).join('');
+}
+
+function toggleCheck(i) {
+  const items = getChecklistFromDOM();
+  items[i].done = !items[i].done;
+  renderChecklist(items);
+}
+
+function removeCheck(i) {
+  const items = getChecklistFromDOM();
+  items.splice(i, 1);
+  renderChecklist(items);
+}
+
+function addCheckItem() {
+  const inp = document.getElementById('newCheckItem');
+  if (!inp.value.trim()) return;
+  const items = getChecklistFromDOM();
+  items.push({ text: inp.value.trim(), done: false });
+  renderChecklist(items);
+  inp.value = '';
+}
+
+function getChecklistFromDOM() {
+  const el = document.getElementById('checklistItems');
+  return [...el.querySelectorAll('.check-item')].map((row, i) => ({
+    text: document.getElementById('chktext-' + i)?.textContent || '',
+    done: row.querySelector('input[type=checkbox]')?.checked || false
+  }));
+}
+
+function saveIssue() {
+  const title = document.getElementById('issueTitle').value.trim();
+  if (!title) { toast('Issue title is required.', 'error'); return; }
+  const labels = [...document.getElementById('issueLabels').selectedOptions].map(o=>o.value);
+  const data = {
+    title,
+    type: document.getElementById('issueType').value,
+    status: document.getElementById('issueStatus').value,
+    priority: document.getElementById('issuePriority').value,
+    assignee: document.getElementById('issueAssignee').value,
+    workstream: document.getElementById('issueWorkstream').value,
+    labels,
+    start: document.getElementById('issueStart').value,
+    end: document.getElementById('issueEnd').value,
+    desc: document.getElementById('issueDesc').value,
+    checklist: getChecklistFromDOM(),
+    created: new Date().toISOString()
+  };
+  if (editingIssueId) {
+    const idx = DB.issues.findIndex(i => i.id === editingIssueId);
+    DB.issues[idx] = { ...DB.issues[idx], ...data };
+    logActivity(`Updated issue #${editingIssueId}: ${title}`);
+    toast('Issue updated successfully', 'success');
+  } else {
+    const issue = { id: DB.nextIssueId++, ...data };
+    DB.issues.push(issue);
+    logActivity(`Created issue #${issue.id}: ${title}`);
+    toast('Issue created successfully', 'success');
+  }
+  closeModal('issueModal');
+  updateOpenCount();
+  renderIssues();
+}
+
+function deleteIssue(id) {
+  if (!confirm('Delete this issue?')) return;
+  DB.issues = DB.issues.filter(i => i.id !== id);
+  logActivity(`Deleted issue #${id}`);
+  toast('Issue deleted', 'info');
+  updateOpenCount();
+  renderIssues();
+}
+
+// ====== KANBAN ======
+let dragIssueId = null;
+
+function renderKanban() {
+  const board = document.getElementById('kanbanBoard');
+  const issues = getFilteredIssues();
+  board.innerHTML = DB.statuses.map(s => {
+    const cols = issues.filter(i => i.status === s.name);
+    return `
+    <div class="kanban-col" data-status="${s.name}" ondrop="dropCard(event,'${s.name}')" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')">
+      <div class="kanban-col-header">
+        <div class="kanban-col-title" style="color:${s.color}">${s.name}</div>
+        <div class="kanban-col-count">${cols.length}</div>
+      </div>
+      <div class="kanban-cards">
+        ${cols.map(i => kanbanCard(i)).join('')}
+        ${currentUser?.role !== 'viewer' ? `<button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:4px;" onclick="openNewIssue()">+ Add</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function kanbanCard(i) {
+  const prioColors = { Critical:'var(--critical)', High:'var(--high)', Medium:'var(--medium)', Low:'var(--low)' };
+  return `<div class="kanban-card" draggable="true" ondragstart="dragStart(event,${i.id})" ondragend="dragEnd(event)" onclick="openEditIssue(${i.id})">
+    <div class="kanban-card-title">${i.title}</div>
+    <div class="kanban-card-meta">
+      <span class="badge badge-${i.type.toLowerCase()}" style="font-size:10px;">${i.type}</span>
+      <span class="prio-dot prio-${i.priority.toLowerCase()}" title="${i.priority}" style="background:${prioColors[i.priority]}"></span>
+      <span class="kanban-card-id">#${i.id}</span>
+      ${i.assignee ? `<span style="margin-left:auto;font-size:10px;color:var(--text3);">${i.assignee.split(' ')[0]}</span>` : ''}
+    </div>
+    ${i.checklist?.length ? `<div style="font-size:10px;color:var(--text3);margin-top:6px;font-family:var(--mono);">${i.checklist.filter(c=>c.done).length}/${i.checklist.length} done</div>` : ''}
+  </div>`;
+}
+
+function dragStart(event, id) {
+  dragIssueId = id;
+  event.target.classList.add('dragging');
+  event.dataTransfer.effectAllowed = 'move';
+}
+function dragEnd(event) { event.target.classList.remove('dragging'); document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over')); }
+function dropCard(event, status) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drag-over');
+  if (!dragIssueId) return;
+  const issue = DB.issues.find(i => i.id === dragIssueId);
+  if (issue) { issue.status = status; logActivity(`Moved #${issue.id} to ${status}`); updateOpenCount(); renderKanban(); toast(`Moved to ${status}`, 'info'); }
+  dragIssueId = null;
+}
+
+// ====== GANTT ======
+function renderGantt() {
+  const issues = DB.issues.filter(i => i.start && i.end).sort((a,b) => new Date(a.start)-new Date(b.start));
+  if (!issues.length) { document.getElementById('ganttWrap').innerHTML = '<div class="empty" style="padding:60px;"><div class="empty-title">No issues with dates</div><div class="empty-sub">Set start and end dates on issues to see them here.</div></div>'; return; }
+  const allStarts = issues.map(i=>new Date(i.start)), allEnds = issues.map(i=>new Date(i.end));
+  let minDate = new Date(Math.min(...allStarts)); minDate.setDate(1);
+  let maxDate = new Date(Math.max(...allEnds)); maxDate.setMonth(maxDate.getMonth()+1); maxDate.setDate(0);
+  const totalDays = Math.max(1, (maxDate - minDate) / 86400000);
+  const months = [];
+  let cur = new Date(minDate);
+  while (cur <= maxDate) { months.push(new Date(cur)); cur.setMonth(cur.getMonth()+1); }
+  const wrap = document.getElementById('ganttWrap');
+  const barColors = ['#6c63ff','#14b8a6','#ec4899','#f59e0b','#3b82f6','#22c55e','#ef4444','#f97316'];
+  let html = `<div class="gantt-container"><div class="gantt-header">
+    <div class="gantt-label-col">Issue</div>
+    <div class="gantt-timeline">${months.map(m=>`<div class="gantt-month">${m.toLocaleString('default',{month:'short'})} ${m.getFullYear()}</div>`).join('')}</div>
+  </div>`;
+  issues.forEach((issue, idx) => {
+    const s = new Date(issue.start), e = new Date(issue.end);
+    const left = ((s-minDate)/86400000/totalDays*100).toFixed(2);
+    const width = Math.max(0.5, ((e-s)/86400000/totalDays*100)).toFixed(2);
+    const color = barColors[idx % barColors.length];
+    const done = issue.checklist?.length ? Math.round(issue.checklist.filter(c=>c.done).length/issue.checklist.length*100) : 0;
+    html += `<div class="gantt-row">
+      <div class="gantt-row-label"><span class="prio-dot prio-${issue.priority.toLowerCase()}" style="flex-shrink:0;"></span>${issue.title}</div>
+      <div class="gantt-track">
+        <div class="gantt-bar" style="left:${left}%;width:${width}%;background:${color}cc;border:1.5px solid ${color};"
+          onmouseenter="showGanttTooltip(event,${issue.id})" onmouseleave="hideGanttTooltip()">
+          ${parseFloat(width)>6 ? issue.title : ''}
+        </div>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
+function showGanttTooltip(e, id) {
+  const issue = DB.issues.find(i=>i.id===id);
+  if (!issue) return;
+  const tt = document.getElementById('ganttTooltip');
+  const done = issue.checklist?.length ? `${issue.checklist.filter(c=>c.done).length}/${issue.checklist.length} tasks` : 'No tasks';
+  tt.innerHTML = `<div class="gantt-tooltip-title">${issue.title}</div>
+    <div class="gantt-tooltip-row">📌 ${issue.type} · ${issue.priority}</div>
+    <div class="gantt-tooltip-row">📋 ${issue.status}</div>
+    <div class="gantt-tooltip-row">👤 ${issue.assignee||'Unassigned'}</div>
+    <div class="gantt-tooltip-row">📅 ${issue.start} → ${issue.end}</div>
+    <div class="gantt-tooltip-row">✅ ${done}</div>`;
+  tt.style.left = (e.clientX+14)+'px';
+  tt.style.top = (e.clientY-10)+'px';
+  tt.classList.add('visible');
+}
+function hideGanttTooltip() { document.getElementById('ganttTooltip').classList.remove('visible'); }
+document.addEventListener('mousemove', e => {
+  const tt = document.getElementById('ganttTooltip');
+  if (tt?.classList.contains('visible')) { tt.style.left=(e.clientX+14)+'px'; tt.style.top=(e.clientY-10)+'px'; }
+});
+
+// ====== WORKSTREAMS ======
+function renderWorkstreams() {
+  const el = document.getElementById('workstreamList');
+  if (!DB.workstreams.length) { el.innerHTML = '<div class="empty"><div class="empty-title">No workstreams yet</div></div>'; return; }
+  el.innerHTML = DB.workstreams.map(w => {
+    const members = DB.users.filter(u => u.dept === w.dept);
+    const issues = DB.issues.filter(i => i.workstream === w.name);
+    const done = issues.filter(i => i.status === 'Done').length;
+    const pct = issues.length ? Math.round(done/issues.length*100) : 0;
+    return `<div class="ws-card">
+      <div class="ws-header">
+        <div>
+          <div class="ws-name">${w.name}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px;font-family:var(--mono);">${w.dept}</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          ${currentUser?.role==='admin' ? `<button class="btn btn-ghost btn-sm" onclick="openWorkstreamModal(${w.id})">Edit</button>` : ''}
+          ${currentUser?.role==='admin' ? `<button class="btn btn-danger btn-sm" onclick="deleteWorkstream(${w.id})">Delete</button>` : ''}
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--text2);">${w.desc}</div>
+      <div style="display:flex;gap:24px;margin-top:12px;">
+        <div><span style="font-size:20px;font-weight:600;font-family:var(--mono);color:${w.color}">${issues.length}</span><div style="font-size:11px;color:var(--text3);font-family:var(--mono);">ISSUES</div></div>
+        <div><span style="font-size:20px;font-weight:600;font-family:var(--mono);color:var(--green)">${done}</span><div style="font-size:11px;color:var(--text3);font-family:var(--mono);">DONE</div></div>
+        <div><span style="font-size:20px;font-weight:600;font-family:var(--mono);">${members.length}</span><div style="font-size:11px;color:var(--text3);font-family:var(--mono);">MEMBERS</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+        <div class="progress-bar" style="flex:1;"><div class="progress-fill" style="width:${pct}%;background:${w.color}"></div></div>
+        <span style="font-size:11px;font-family:var(--mono);color:var(--text2);">${pct}%</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openWorkstreamModal(id) {
+  editingWsId = id || null;
+  if (id) {
+    const ws = DB.workstreams.find(w=>w.id===id);
+    document.getElementById('wsModalTitle').textContent = 'Edit Workstream';
+    document.getElementById('wsId').value = id;
+    document.getElementById('wsName').value = ws.name;
+    document.getElementById('wsDept').value = ws.dept;
+    document.getElementById('wsDesc').value = ws.desc;
+    document.getElementById('wsColor').value = ws.color;
+  } else {
+    document.getElementById('wsModalTitle').textContent = 'New Workstream';
+    document.getElementById('wsId').value = '';
+    document.getElementById('wsName').value = '';
+    document.getElementById('wsDept').value = '';
+    document.getElementById('wsDesc').value = '';
+    document.getElementById('wsColor').value = '#6c63ff';
+  }
+  document.getElementById('workstreamModal').classList.remove('hidden');
+}
+
+function saveWorkstream() {
+  const name = document.getElementById('wsName').value.trim();
+  if (!name) { toast('Workstream name required','error'); return; }
+  const data = { name, dept: document.getElementById('wsDept').value, desc: document.getElementById('wsDesc').value, color: document.getElementById('wsColor').value };
+  if (editingWsId) { const idx = DB.workstreams.findIndex(w=>w.id===editingWsId); DB.workstreams[idx]={...DB.workstreams[idx],...data}; toast('Workstream updated','success'); }
+  else { DB.workstreams.push({id:DB.nextWsId++,...data}); toast('Workstream created','success'); }
+  closeModal('workstreamModal'); renderWorkstreams(); populateFilters();
+}
+
+function deleteWorkstream(id) {
+  if (!confirm('Delete this workstream?')) return;
+  DB.workstreams = DB.workstreams.filter(w=>w.id!==id);
+  renderWorkstreams(); populateFilters(); toast('Workstream deleted','info');
+}
+
+// ====== SETTINGS ======
+function settingsTab(tab, el) {
+  document.querySelectorAll('.settings-content').forEach(c => c.classList.add('hidden'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('settings-'+tab).classList.remove('hidden');
+  el.classList.add('active');
+  if (tab==='users') renderUsers();
+}
+
+function renderSettings() {
+  renderTypeList(); renderPriorityList(); renderLabelList(); renderStatusList(); renderUsers();
+}
+
+function renderTypeList() {
+  document.getElementById('typeList').innerHTML = DB.types.map((t,i) =>
+    `<span class="tag-item"><span style="width:10px;height:10px;background:${t.color};border-radius:50%;display:inline-block;margin-right:4px;"></span>${t.name}
+    <button class="tag-remove" onclick="removeType(${i})">✕</button></span>`).join('');
+}
+function addType() {
+  const v = document.getElementById('newType').value.trim(); if (!v) return;
+  DB.types.push({name:v, color:document.getElementById('typeColor').value});
+  document.getElementById('newType').value=''; renderTypeList(); populateFilters(); toast('Type added','success');
+}
+function removeType(i) { DB.types.splice(i,1); renderTypeList(); }
+
+function renderPriorityList() {
+  const colors = { Critical:'var(--critical)', High:'var(--high)', Medium:'var(--medium)', Low:'var(--low)' };
+  document.getElementById('priorityList').innerHTML = DB.priorities.map(p =>
+    `<span class="tag-item"><span class="prio-dot prio-${p.toLowerCase()}" style="background:${colors[p]||'#999'}"></span>${p}</span>`).join('');
+}
+
+function renderLabelList() {
+  document.getElementById('labelList').innerHTML = DB.labels.map((l,i) =>
+    `<span class="tag-item"><span style="width:10px;height:10px;background:${l.color};border-radius:50%;display:inline-block;margin-right:4px;"></span>${l.name}
+    <button class="tag-remove" onclick="removeLabel(${i})">✕</button></span>`).join('');
+}
+function addLabel() {
+  const v = document.getElementById('newLabel').value.trim(); if (!v) return;
+  DB.labels.push({name:v, color:document.getElementById('labelColor').value});
+  document.getElementById('newLabel').value=''; renderLabelList(); toast('Label added','success');
+}
+function removeLabel(i) { DB.labels.splice(i,1); renderLabelList(); }
+
+function renderStatusList() {
+  document.getElementById('statusList').innerHTML = DB.statuses.map((s,i) =>
+    `<span class="tag-item"><span style="width:10px;height:10px;background:${s.color};border-radius:50%;display:inline-block;margin-right:4px;"></span>${s.name}
+    <button class="tag-remove" onclick="removeStatus(${i})">✕</button></span>`).join('');
+}
+function addStatus() {
+  const v = document.getElementById('newStatus').value.trim(); if (!v) return;
+  DB.statuses.push({name:v, color:document.getElementById('statusColor').value});
+  document.getElementById('newStatus').value=''; renderStatusList(); populateFilters(); toast('Status added','success');
+}
+function removeStatus(i) { DB.statuses.splice(i,1); renderStatusList(); populateFilters(); }
+
+// ====== USERS ======
+function renderUsers() {
+  const tbody = document.getElementById('usersTbody');
+  if (!tbody) return;
+  tbody.innerHTML = DB.users.map(u => `<tr>
+    <td><div style="display:flex;align-items:center;gap:8px;"><div class="avatar" style="width:28px;height:28px;font-size:11px;background:var(--accent);">${u.name[0]}</div>${u.name}</div></td>
+    <td class="mono" style="font-size:12px;">${u.username}</td>
+    <td style="color:var(--text2);font-size:12px;">${u.email||'—'}</td>
+    <td><span class="role-badge role-${u.role}">${u.role}</span></td>
+    <td style="font-size:12px;color:var(--text2);">${u.dept||'—'}</td>
+    <td><div style="display:flex;gap:4px;">
+      ${currentUser?.role==='admin' ? `<button class="btn btn-ghost btn-sm" onclick="openUserModal(${u.id})">Edit</button>` : ''}
+      ${currentUser?.role==='admin' && u.id!==currentUser.id ? `<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">Delete</button>` : ''}
+    </div></td>
+  </tr>`).join('');
+}
+
+function openUserModal(id) {
+  editingUserId = id || null;
+  if (id) {
+    const u = DB.users.find(x=>x.id===id);
+    document.getElementById('userModalTitle').textContent = 'Edit User';
+    document.getElementById('userId').value = id;
+    document.getElementById('userName').value = u.name;
+    document.getElementById('userUsername').value = u.username;
+    document.getElementById('userEmail').value = u.email||'';
+    document.getElementById('userPassword').value = '';
+    document.getElementById('userRole').value = u.role;
+    document.getElementById('userDept').value = u.dept||'';
+    document.getElementById('userResponsibilities').value = u.responsibilities||'';
+  } else {
+    document.getElementById('userModalTitle').textContent = 'Add User';
+    document.getElementById('userId').value = '';
+    ['userName','userUsername','userEmail','userPassword','userDept','userResponsibilities'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('userRole').value = 'dev';
+  }
+  document.getElementById('userModal').classList.remove('hidden');
+}
+
+function saveUser() {
+  const name = document.getElementById('userName').value.trim();
+  const username = document.getElementById('userUsername').value.trim();
+  if (!name || !username) { toast('Name and username required','error'); return; }
+  const data = {
+    name, username, email: document.getElementById('userEmail').value, role: document.getElementById('userRole').value,
+    dept: document.getElementById('userDept').value, responsibilities: document.getElementById('userResponsibilities').value
+  };
+  const pw = document.getElementById('userPassword').value;
+  if (pw) data.password = pw;
+  if (editingUserId) {
+    const idx = DB.users.findIndex(u=>u.id===editingUserId);
+    DB.users[idx]={...DB.users[idx],...data};
+    toast('User updated','success');
+  } else {
+    if (!pw) { toast('Password required for new user','error'); return; }
+    DB.users.push({id:DB.nextUserId++,password:pw,...data});
+    toast('User created','success');
+  }
+  closeModal('userModal'); renderUsers(); populateFilters();
+}
+
+function deleteUser(id) {
+  if (!confirm('Delete this user?')) return;
+  DB.users = DB.users.filter(u=>u.id!==id);
+  renderUsers(); toast('User deleted','info');
+}
+
+// ====== EXCEL IMPORT/EXPORT ======
+function exportExcel() {
+  const rows = DB.issues.map(i => ({
+    ID: i.id, Title: i.title, Type: i.type, Status: i.status, Priority: i.priority,
+    Assignee: i.assignee||'', Workstream: i.workstream||'', Labels: (i.labels||[]).join(', '),
+    StartDate: i.start||'', EndDate: i.end||'', Description: i.desc||'',
+    ChecklistTotal: (i.checklist||[]).length, ChecklistDone: (i.checklist||[]).filter(c=>c.done).length
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Issues');
+  XLSX.writeFile(wb, 'FlowDesk_Issues_' + fmtDate(new Date()) + '.xlsx');
+  toast('Exported to Excel', 'success');
+}
+
+function importExcel(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws);
+      let imported = 0;
+      rows.forEach(row => {
+        if (!row.Title) return;
+        const existing = row.ID ? DB.issues.find(i=>i.id===parseInt(row.ID)) : null;
+        const issue = {
+          title: row.Title, type: row.Type||'Task', status: row.Status||'To Do',
+          priority: row.Priority||'Medium', assignee: row.Assignee||'',
+          workstream: row.Workstream||'', labels: row.Labels?row.Labels.split(',').map(l=>l.trim()):[],
+          start: row.StartDate||'', end: row.EndDate||'', desc: row.Description||'', checklist: [], created: new Date().toISOString()
+        };
+        if (existing) { Object.assign(existing, issue); }
+        else { DB.issues.push({id:DB.nextIssueId++,...issue}); imported++; }
+      });
+      toast(`Imported ${imported} new issues`, 'success');
+      renderIssues(); updateOpenCount(); populateFilters();
+    } catch(err) { toast('Import failed: ' + err.message, 'error'); }
+    input.value='';
+  };
+  reader.readAsBinaryString(file);
+}
+
+// ====== UTILS ======
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+function toast(msg, type='info') {
+  const ct = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  const icons = {success:'✅',error:'❌',info:'ℹ️'};
+  t.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  ct.appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateX(100%)'; t.style.transition='all 0.3s'; setTimeout(()=>t.remove(),300); }, 3000);
+}
+
+// Keyboard shortcut
+document.addEventListener('keydown', e => { if (e.key==='Escape') document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(m=>m.classList.add('hidden')); });
+document.addEventListener('keydown', e => { if (e.key==='n' && e.ctrlKey) { e.preventDefault(); openNewIssue(); } });
+</script>
+</body>
+</html>
