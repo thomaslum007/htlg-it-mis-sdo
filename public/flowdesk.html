@@ -877,27 +877,29 @@ function updateOpenCount() {
 
 // ====== DASHBOARD ======
 function renderDashboard() {
-  const total = DB.issues.length;
-  const done = DB.issues.filter(i => i.status === 'Done').length;
-  const inprog = DB.issues.filter(i => i.status === 'In Progress').length;
-  const blocked = DB.issues.filter(i => i.status === 'Blocked').length;
-  const critical = DB.issues.filter(i => i.priority === 'Critical').length;
+  const issues = getFilteredIssues('dash');
+  const total = issues.length;
+  const done = issues.filter(i => i.status === 'Done').length;
+  const inprog = issues.filter(i => i.status === 'In Progress').length;
+  const blocked = issues.filter(i => i.status === 'Blocked').length;
+  const critical = issues.filter(i => i.priority === 'Critical').length;
   document.getElementById('statCards').innerHTML = `
     <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">Total Issues</div></div>
     <div class="stat-card"><div class="stat-num" style="color:var(--blue)">${inprog}</div><div class="stat-label">In Progress</div></div>
     <div class="stat-card"><div class="stat-num" style="color:var(--green)">${done}</div><div class="stat-label">Completed</div></div>
     <div class="stat-card"><div class="stat-num" style="color:var(--red)">${blocked + critical}</div><div class="stat-label">Needs Attention</div></div>
   `;
-  renderStatusChart();
-  renderPriorityChart();
+  renderStatusChart(issues);
+  renderPriorityChart(issues);
   renderActivity();
 }
 
-function renderStatusChart() {
+function renderStatusChart(issues) {
   const ctx = document.getElementById('statusChart');
   if (!ctx) return;
   if (chartInstances.status) chartInstances.status.destroy();
-  const counts = DB.statuses.map(s => DB.issues.filter(i => i.status === s.name).length);
+  const src = issues || DB.issues;
+  const counts = DB.statuses.map(s => src.filter(i => i.status === s.name).length);
   chartInstances.status = new Chart(ctx, {
     type: 'doughnut',
     data: { labels: DB.statuses.map(s=>s.name), datasets: [{ data: counts, backgroundColor: DB.statuses.map(s=>s.color+'99'), borderColor: DB.statuses.map(s=>s.color), borderWidth: 2 }] },
@@ -905,12 +907,13 @@ function renderStatusChart() {
   });
 }
 
-function renderPriorityChart() {
+function renderPriorityChart(issues) {
   const ctx = document.getElementById('priorityChart');
   if (!ctx) return;
   if (chartInstances.priority) chartInstances.priority.destroy();
   const colors = { Critical:'#ff4d4d', High:'#ff8c42', Medium:'#ffd166', Low:'#06d6a0' };
-  const counts = DB.priorities.map(p => DB.issues.filter(i => i.priority === p).length);
+  const src = issues || DB.issues;
+  const counts = DB.priorities.map(p => src.filter(i => i.priority === p).length);
   chartInstances.priority = new Chart(ctx, {
     type: 'bar',
     data: { labels: DB.priorities, datasets: [{ data: counts, backgroundColor: DB.priorities.map(p=>colors[p]+'88'), borderColor: DB.priorities.map(p=>colors[p]), borderWidth: 2, borderRadius: 4 }] },
@@ -983,7 +986,7 @@ function clearFilters(scope) {
 }
 
 function renderIssues() {
-  const issues = getFilteredIssues();
+  const issues = getFilteredIssues('iss');
   const tbody = document.getElementById('issuesTbody');
   if (!tbody) return;
   if (!issues.length) { tbody.innerHTML = `<tr><td colspan="11"><div class="empty"><div class="empty-icon">🗂</div><div class="empty-title">No issues found</div></div></td></tr>`; return; }
@@ -1157,7 +1160,7 @@ let dragIssueId = null;
 
 function renderKanban() {
   const board = document.getElementById('kanbanBoard');
-  const issues = getFilteredIssues();
+  const issues = getFilteredIssues('kan');
   board.innerHTML = DB.statuses.map(s => {
     const cols = issues.filter(i => i.status === s.name);
     return `
@@ -1205,7 +1208,7 @@ function dropCard(event, status) {
 
 // ====== GANTT ======
 function renderGantt() {
-  const issues = DB.issues.filter(i => i.start && i.end).sort((a,b) => new Date(a.start)-new Date(b.start));
+  const issues = getFilteredIssues('gan').filter(i => i.start && i.end).sort((a,b) => new Date(a.start)-new Date(b.start));
   if (!issues.length) { document.getElementById('ganttWrap').innerHTML = '<div class="empty" style="padding:60px;"><div class="empty-title">No issues with dates</div><div class="empty-sub">Set start and end dates on issues to see them here.</div></div>'; return; }
   const allStarts = issues.map(i=>new Date(i.start)), allEnds = issues.map(i=>new Date(i.end));
   let minDate = new Date(Math.min(...allStarts)); minDate.setDate(1);
