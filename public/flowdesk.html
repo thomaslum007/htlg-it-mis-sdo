@@ -312,6 +312,28 @@ textarea { resize: vertical; min-height: 80px; }
 .filter-title { font-size: 11px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; font-weight: 600; }
 .filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .filter-row select { min-width: 140px; }
+/* Multi-select filter */
+.filter-multi { position: relative; min-width: 160px; }
+.filter-multi-btn { background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text); font-family: var(--font); font-size: 13px; padding: 8px 12px; cursor: pointer; width: 100%; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.filter-multi-btn:hover { border-color: var(--accent); }
+.filter-multi-btn .caret { color: var(--text3); font-size: 10px; }
+.filter-multi-panel { position: absolute; top: calc(100% + 4px); left: 0; min-width: 100%; background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); padding: 6px; z-index: 200; max-height: 240px; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.4); display: none; }
+.filter-multi-panel.open { display: block; }
+.filter-multi-opt { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 13px; color: var(--text); }
+.filter-multi-opt:hover { background: var(--surface2); }
+.filter-multi-opt input { accent-color: var(--accent); cursor: pointer; }
+.filter-multi-count { background: var(--accent); color: white; font-family: var(--mono); font-size: 10px; padding: 1px 6px; border-radius: 10px; }
+/* Activity feed */
+.activity-user { font-weight: 600; color: var(--accent2); }
+.activity-user-avatar { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; background: var(--accent); color: white; flex-shrink: 0; margin-top: 2px; }
+/* Permissions matrix */
+.perm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.perm-table th, .perm-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: center; }
+.perm-table th:first-child, .perm-table td:first-child { text-align: left; }
+.perm-table th { font-family: var(--mono); font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
+.perm-cell { display: inline-flex; gap: 4px; }
+.perm-cell label { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-family: var(--mono); color: var(--text2); text-transform: none; letter-spacing: 0; cursor: pointer; margin: 0; }
+.perm-cell input { accent-color: var(--accent); cursor: pointer; }
 </style>
 </head>
 <body>
