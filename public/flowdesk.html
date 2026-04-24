@@ -1002,50 +1002,123 @@ function logActivity(text) {
 
 // ====== ISSUES ======
 const FILTER_SCOPES = ['iss','dash','kan','gan'];
+// ====== MULTI-SELECT FILTERS (per-tab, isolated) ======
+// State: { [scope]: { Type:Set, Status:Set, Priority:Set, Assignee:Set, Workstream:Set } }
+const FILTER_KEYS = ['Type','Status','Priority','Assignee','Workstream'];
+const filterState = {};
+FILTER_SCOPES.forEach(s => { filterState[s] = {}; FILTER_KEYS.forEach(k => filterState[s][k] = new Set()); });
+
+function getFilterOptions(key) {
+  switch(key) {
+    case 'Type': return DB.types.map(t=>t.name);
+    case 'Status': return DB.statuses.map(s=>s.name);
+    case 'Priority': return [...DB.priorities];
+    case 'Assignee': return DB.users.map(u=>u.name);
+    case 'Workstream': return DB.workstreams.map(w=>w.name);
+  }
+  return [];
+}
+
+function buildFilterUI() {
+  const scopeRender = { iss: renderIssues, dash: renderDashboard, kan: renderKanban, gan: renderGantt };
+  FILTER_SCOPES.forEach(scope => {
+    const row = document.getElementById(`${scope}_filterRow`);
+    if (!row) return;
+    row.innerHTML = FILTER_KEYS.map(k => {
+      const id = `${scope}_filter${k}`;
+      return `<div class="filter-multi" id="${id}_wrap">
+        <button type="button" class="filter-multi-btn" id="${id}_btn" onclick="toggleFilterPanel('${scope}','${k}')">
+          <span id="${id}_label">All ${k}s</span>
+          <span class="caret">▾</span>
+        </button>
+        <div class="filter-multi-panel" id="${id}_panel"></div>
+      </div>`;
+    }).join('') + `<button class="btn btn-ghost btn-sm" onclick="clearFilters('${scope}')">Clear</button>`;
+  });
+  // Close on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.filter-multi')) {
+      document.querySelectorAll('.filter-multi-panel.open').forEach(p => p.classList.remove('open'));
+    }
+  });
+}
+
+function toggleFilterPanel(scope, key) {
+  const panel = document.getElementById(`${scope}_filter${key}_panel`);
+  const open = panel.classList.contains('open');
+  document.querySelectorAll('.filter-multi-panel.open').forEach(p => p.classList.remove('open'));
+  if (open) return;
+  // Render options
+  const opts = getFilterOptions(key);
+  const sel = filterState[scope][key];
+  panel.innerHTML = opts.map(o => `
+    <label class="filter-multi-opt">
+      <input type="checkbox" ${sel.has(o)?'checked':''} onchange="onFilterChange('${scope}','${key}','${escapeAttr(o)}', this.checked)">
+      <span>${escapeHtml(o)}</span>
+    </label>`).join('') || `<div style="padding:8px;color:var(--text3);font-size:12px;">No options</div>`;
+  panel.classList.add('open');
+}
+
+function escapeAttr(s) { return String(s).replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+
+function onFilterChange(scope, key, value, checked) {
+  if (checked) filterState[scope][key].add(value); else filterState[scope][key].delete(value);
+  updateFilterLabel(scope, key);
+  rerenderScope(scope);
+}
+
+function updateFilterLabel(scope, key) {
+  const lbl = document.getElementById(`${scope}_filter${key}_label`);
+  if (!lbl) return;
+  const sel = filterState[scope][key];
+  if (sel.size === 0) lbl.textContent = `All ${key}s`;
+  else if (sel.size === 1) lbl.textContent = [...sel][0];
+  else lbl.textContent = `${key} · ${sel.size} selected`;
+}
+
+function rerenderScope(scope) {
+  if (scope==='iss') renderIssues();
+  else if (scope==='dash') renderDashboard();
+  else if (scope==='kan') renderKanban();
+  else if (scope==='gan') renderGantt();
+}
+
+// Refresh option lists when underlying data (types/users/etc.) changes — preserves selections
 function populateFilters() {
   FILTER_SCOPES.forEach(scope => {
-    const setOpts = (id, html) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      const cur = el.value;
-      el.innerHTML = html;
-      el.value = cur;
-    };
-    setOpts(`${scope}_filterType`, `<option value="">All Types</option>` + DB.types.map(t=>`<option value="${t.name}">${t.name}</option>`).join(''));
-    setOpts(`${scope}_filterStatus`, `<option value="">All Statuses</option>` + DB.statuses.map(s=>`<option value="${s.name}">${s.name}</option>`).join(''));
-    setOpts(`${scope}_filterPriority`, `<option value="">All Priorities</option>` + DB.priorities.map(p=>`<option value="${p}">${p}</option>`).join(''));
-    setOpts(`${scope}_filterAssignee`, `<option value="">All Assignees</option>` + DB.users.map(u=>`<option value="${u.name}">${u.name}</option>`).join(''));
-    setOpts(`${scope}_filterWorkstream`, `<option value="">All Workstreams</option>` + DB.workstreams.map(w=>`<option value="${w.name}">${w.name}</option>`).join(''));
+    FILTER_KEYS.forEach(key => {
+      const valid = new Set(getFilterOptions(key));
+      // Drop selections that no longer exist
+      [...filterState[scope][key]].forEach(v => { if (!valid.has(v)) filterState[scope][key].delete(v); });
+      updateFilterLabel(scope, key);
+      // If panel open, re-render its checkboxes
+      const panel = document.getElementById(`${scope}_filter${key}_panel`);
+      if (panel?.classList.contains('open')) toggleFilterPanel(scope, key) || toggleFilterPanel(scope, key);
+    });
   });
 }
 
 function getFilteredIssues(scope) {
   scope = scope || 'iss';
+  const f = filterState[scope] || {};
   let list = [...DB.issues];
-  const st = document.getElementById(`${scope}_filterStatus`)?.value;
-  const pr = document.getElementById(`${scope}_filterPriority`)?.value;
-  const ty = document.getElementById(`${scope}_filterType`)?.value;
-  const as = document.getElementById(`${scope}_filterAssignee`)?.value;
-  const ws = document.getElementById(`${scope}_filterWorkstream`)?.value;
+  const st = f.Status, pr = f.Priority, ty = f.Type, as = f.Assignee, ws = f.Workstream;
+  if (st && st.size) list = list.filter(i => st.has(i.status));
+  if (pr && pr.size) list = list.filter(i => pr.has(i.priority));
+  if (ty && ty.size) list = list.filter(i => ty.has(i.type));
+  if (as && as.size) list = list.filter(i => as.has(i.assignee));
+  if (ws && ws.size) list = list.filter(i => ws.has(i.workstream));
   const gs = document.getElementById('globalSearch')?.value.toLowerCase();
-  if (st) list = list.filter(i => i.status === st);
-  if (pr) list = list.filter(i => i.priority === pr);
-  if (ty) list = list.filter(i => i.type === ty);
-  if (as) list = list.filter(i => i.assignee === as);
-  if (ws) list = list.filter(i => i.workstream === ws);
   if (gs) list = list.filter(i => i.title.toLowerCase().includes(gs) || (i.desc||'').toLowerCase().includes(gs) || String(i.id).includes(gs));
   return list;
 }
 
 function clearFilters(scope) {
-  ['Type','Status','Priority','Assignee','Workstream'].forEach(k => {
-    const el = document.getElementById(`${scope}_filter${k}`);
-    if (el) el.value = '';
+  FILTER_KEYS.forEach(k => {
+    filterState[scope][k].clear();
+    updateFilterLabel(scope, k);
   });
-  if (scope==='iss') renderIssues();
-  else if (scope==='dash') renderDashboard();
-  else if (scope==='kan') renderKanban();
-  else if (scope==='gan') renderGantt();
+  rerenderScope(scope);
 }
 
 function renderIssues() {
