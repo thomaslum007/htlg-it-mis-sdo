@@ -1175,7 +1175,7 @@ function populateIssueDropdowns() {
 }
 
 function openNewIssue() {
-  if (currentUser?.role === 'viewer') { toast('You do not have permission to create issues.', 'error'); return; }
+  if (!can('interact','issues')) { toast('You do not have permission to create issues.', 'error'); return; }
   editingIssueId = null;
   document.getElementById('issueModalTitle').textContent = 'New Issue';
   document.getElementById('issueId').value = '';
@@ -1191,6 +1191,7 @@ function openNewIssue() {
 function openEditIssue(id) {
   const issue = DB.issues.find(i => i.id === id);
   if (!issue) return;
+  if (!canEditIssue(issue)) { toast('You can only edit issues you created.', 'error'); return; }
   editingIssueId = id;
   document.getElementById('issueModalTitle').textContent = 'Edit Issue #' + id;
   document.getElementById('issueId').value = id;
