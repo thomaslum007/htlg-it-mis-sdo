@@ -469,14 +469,7 @@ textarea { resize: vertical; min-height: 80px; }
   <div class="content page hidden" id="page-kanban">
     <div class="filter-bar">
       <div class="filter-title">Filters</div>
-      <div class="filter-row">
-        <select id="kan_filterType" onchange="renderKanban()" style="width:auto;"><option value="">All Types</option></select>
-        <select id="kan_filterStatus" onchange="renderKanban()" style="width:auto;"><option value="">All Statuses</option></select>
-        <select id="kan_filterPriority" onchange="renderKanban()" style="width:auto;"><option value="">All Priorities</option></select>
-        <select id="kan_filterAssignee" onchange="renderKanban()" style="width:auto;"><option value="">All Assignees</option></select>
-        <select id="kan_filterWorkstream" onchange="renderKanban()" style="width:auto;"><option value="">All Workstreams</option></select>
-        <button class="btn btn-ghost btn-sm" onclick="clearFilters('kan')">Clear</button>
-      </div>
+      <div class="filter-row" id="kan_filterRow"></div>
     </div>
     <div class="kanban-board" id="kanbanBoard"></div>
   </div>
@@ -485,14 +478,7 @@ textarea { resize: vertical; min-height: 80px; }
   <div class="content page hidden" id="page-gantt">
     <div class="filter-bar">
       <div class="filter-title">Filters</div>
-      <div class="filter-row">
-        <select id="gan_filterType" onchange="renderGantt()" style="width:auto;"><option value="">All Types</option></select>
-        <select id="gan_filterStatus" onchange="renderGantt()" style="width:auto;"><option value="">All Statuses</option></select>
-        <select id="gan_filterPriority" onchange="renderGantt()" style="width:auto;"><option value="">All Priorities</option></select>
-        <select id="gan_filterAssignee" onchange="renderGantt()" style="width:auto;"><option value="">All Assignees</option></select>
-        <select id="gan_filterWorkstream" onchange="renderGantt()" style="width:auto;"><option value="">All Workstreams</option></select>
-        <button class="btn btn-ghost btn-sm" onclick="clearFilters('gan')">Clear</button>
-      </div>
+      <div class="filter-row" id="gan_filterRow"></div>
     </div>
     <div class="card" style="padding:0;overflow:hidden;">
       <div class="gantt-wrap" id="ganttWrap"></div>
