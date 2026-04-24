@@ -312,6 +312,28 @@ textarea { resize: vertical; min-height: 80px; }
 .filter-title { font-size: 11px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; font-weight: 600; }
 .filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .filter-row select { min-width: 140px; }
+/* Multi-select filter */
+.filter-multi { position: relative; min-width: 160px; }
+.filter-multi-btn { background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text); font-family: var(--font); font-size: 13px; padding: 8px 12px; cursor: pointer; width: 100%; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.filter-multi-btn:hover { border-color: var(--accent); }
+.filter-multi-btn .caret { color: var(--text3); font-size: 10px; }
+.filter-multi-panel { position: absolute; top: calc(100% + 4px); left: 0; min-width: 100%; background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); padding: 6px; z-index: 200; max-height: 240px; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.4); display: none; }
+.filter-multi-panel.open { display: block; }
+.filter-multi-opt { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 13px; color: var(--text); }
+.filter-multi-opt:hover { background: var(--surface2); }
+.filter-multi-opt input { accent-color: var(--accent); cursor: pointer; }
+.filter-multi-count { background: var(--accent); color: white; font-family: var(--mono); font-size: 10px; padding: 1px 6px; border-radius: 10px; }
+/* Activity feed */
+.activity-user { font-weight: 600; color: var(--accent2); }
+.activity-user-avatar { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; background: var(--accent); color: white; flex-shrink: 0; margin-top: 2px; }
+/* Permissions matrix */
+.perm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.perm-table th, .perm-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: center; }
+.perm-table th:first-child, .perm-table td:first-child { text-align: left; }
+.perm-table th { font-family: var(--mono); font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
+.perm-cell { display: inline-flex; gap: 4px; }
+.perm-cell label { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-family: var(--mono); color: var(--text2); text-transform: none; letter-spacing: 0; cursor: pointer; margin: 0; }
+.perm-cell input { accent-color: var(--accent); cursor: pointer; }
 </style>
 </head>
 <body>
@@ -403,14 +425,7 @@ textarea { resize: vertical; min-height: 80px; }
   <div class="content page active" id="page-dashboard">
     <div class="filter-bar">
       <div class="filter-title">Filters</div>
-      <div class="filter-row">
-        <select id="dash_filterType" onchange="renderDashboard()" style="width:auto;"><option value="">All Types</option></select>
-        <select id="dash_filterStatus" onchange="renderDashboard()" style="width:auto;"><option value="">All Statuses</option></select>
-        <select id="dash_filterPriority" onchange="renderDashboard()" style="width:auto;"><option value="">All Priorities</option></select>
-        <select id="dash_filterAssignee" onchange="renderDashboard()" style="width:auto;"><option value="">All Assignees</option></select>
-        <select id="dash_filterWorkstream" onchange="renderDashboard()" style="width:auto;"><option value="">All Workstreams</option></select>
-        <button class="btn btn-ghost btn-sm" onclick="clearFilters('dash')">Clear</button>
-      </div>
+      <div class="filter-row" id="dash_filterRow"></div>
     </div>
     <div class="grid-4 mb-4" id="statCards"></div>
     <div class="grid-2" style="gap:20px;">
@@ -433,14 +448,7 @@ textarea { resize: vertical; min-height: 80px; }
   <div class="content page hidden" id="page-issues">
     <div class="filter-bar">
       <div class="filter-title">Filters</div>
-      <div class="filter-row">
-        <select id="iss_filterType" onchange="renderIssues()" style="width:auto;"><option value="">All Types</option></select>
-        <select id="iss_filterStatus" onchange="renderIssues()" style="width:auto;"><option value="">All Statuses</option></select>
-        <select id="iss_filterPriority" onchange="renderIssues()" style="width:auto;"><option value="">All Priorities</option></select>
-        <select id="iss_filterAssignee" onchange="renderIssues()" style="width:auto;"><option value="">All Assignees</option></select>
-        <select id="iss_filterWorkstream" onchange="renderIssues()" style="width:auto;"><option value="">All Workstreams</option></select>
-        <button class="btn btn-ghost btn-sm" onclick="clearFilters('iss')">Clear</button>
-      </div>
+      <div class="filter-row" id="iss_filterRow"></div>
     </div>
     <div class="card" style="padding:0;overflow:hidden;">
       <div class="table-wrap">
@@ -461,14 +469,7 @@ textarea { resize: vertical; min-height: 80px; }
   <div class="content page hidden" id="page-kanban">
     <div class="filter-bar">
       <div class="filter-title">Filters</div>
-      <div class="filter-row">
-        <select id="kan_filterType" onchange="renderKanban()" style="width:auto;"><option value="">All Types</option></select>
-        <select id="kan_filterStatus" onchange="renderKanban()" style="width:auto;"><option value="">All Statuses</option></select>
-        <select id="kan_filterPriority" onchange="renderKanban()" style="width:auto;"><option value="">All Priorities</option></select>
-        <select id="kan_filterAssignee" onchange="renderKanban()" style="width:auto;"><option value="">All Assignees</option></select>
-        <select id="kan_filterWorkstream" onchange="renderKanban()" style="width:auto;"><option value="">All Workstreams</option></select>
-        <button class="btn btn-ghost btn-sm" onclick="clearFilters('kan')">Clear</button>
-      </div>
+      <div class="filter-row" id="kan_filterRow"></div>
     </div>
     <div class="kanban-board" id="kanbanBoard"></div>
   </div>
@@ -477,14 +478,7 @@ textarea { resize: vertical; min-height: 80px; }
   <div class="content page hidden" id="page-gantt">
     <div class="filter-bar">
       <div class="filter-title">Filters</div>
-      <div class="filter-row">
-        <select id="gan_filterType" onchange="renderGantt()" style="width:auto;"><option value="">All Types</option></select>
-        <select id="gan_filterStatus" onchange="renderGantt()" style="width:auto;"><option value="">All Statuses</option></select>
-        <select id="gan_filterPriority" onchange="renderGantt()" style="width:auto;"><option value="">All Priorities</option></select>
-        <select id="gan_filterAssignee" onchange="renderGantt()" style="width:auto;"><option value="">All Assignees</option></select>
-        <select id="gan_filterWorkstream" onchange="renderGantt()" style="width:auto;"><option value="">All Workstreams</option></select>
-        <button class="btn btn-ghost btn-sm" onclick="clearFilters('gan')">Clear</button>
-      </div>
+      <div class="filter-row" id="gan_filterRow"></div>
     </div>
     <div class="card" style="padding:0;overflow:hidden;">
       <div class="gantt-wrap" id="ganttWrap"></div>
@@ -508,6 +502,7 @@ textarea { resize: vertical; min-height: 80px; }
       <div class="tab" onclick="settingsTab('labels',this)">Labels</div>
       <div class="tab" onclick="settingsTab('statuses',this)">Statuses</div>
       <div class="tab" onclick="settingsTab('users',this)">Users</div>
+      <div class="tab" onclick="settingsTab('permissions',this)">Roles &amp; Permissions</div>
     </div>
     <div id="settings-general" class="settings-content">
       <div class="settings-section">
@@ -553,12 +548,27 @@ textarea { resize: vertical; min-height: 80px; }
     <div id="settings-users" class="settings-content hidden">
       <div class="section-header">
         <div class="settings-title">Team Members</div>
-        <button class="btn btn-primary btn-sm" onclick="openUserModal()">+ Add User</button>
+        <button class="btn btn-primary btn-sm" id="addUserBtn" onclick="openUserModal()">+ Add User</button>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
         <div class="table-wrap">
           <table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Department</th><th>Actions</th></tr></thead>
           <tbody id="usersTbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+    <div id="settings-permissions" class="settings-content hidden">
+      <div class="settings-section">
+        <div class="settings-title">Roles &amp; Permissions</div>
+        <div class="settings-desc">Control which tabs each role can <b>View</b> and <b>Interact</b> with. Only admins can change these settings. Viewers can never add users, edit kanban, or edit issues created by others.</div>
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div class="table-wrap">
+            <table class="perm-table" id="permTable"></table>
+          </div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;">
+          <button class="btn btn-ghost btn-sm" onclick="resetPermissions()">Reset to defaults</button>
+          <button class="btn btn-primary btn-sm" id="savePermBtn" onclick="savePermissions()">Save Permissions</button>
         </div>
       </div>
     </div>
@@ -606,7 +616,7 @@ textarea { resize: vertical; min-height: 80px; }
           <select id="issueWorkstream"></select>
         </div>
         <div class="form-group">
-          <label>Labels</label>
+          <label>Labels <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--text3);">(hold Ctrl/Cmd to select multiple)</span></label>
           <select id="issueLabels" multiple style="height:70px;"></select>
         </div>
       </div>
@@ -774,6 +784,9 @@ let DB = {
   nextIssueId: 1,
   nextUserId: 5,
   nextWsId: 5,
+  // Per-role tab permissions: view + interact (edit/create/drag)
+  // Pages: dashboard, issues, kanban, gantt, workstreams, settings
+  permissions: null, // populated by initPermissions()
 };
 
 let currentUser = null;
@@ -781,9 +794,43 @@ let editingIssueId = null;
 let editingUserId = null;
 let editingWsId = null;
 let chartInstances = {};
+let appSeeded = false; // fix: prevent re-seeding sample issues on every login
+
+const PERM_PAGES = ['dashboard','issues','kanban','gantt','workstreams','settings'];
+const PERM_ROLES = ['admin','pm','dev','viewer'];
+const DEFAULT_PERMISSIONS = {
+  admin:   { dashboard:{view:true,interact:true}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:true}, workstreams:{view:true,interact:true}, settings:{view:true,interact:true} },
+  pm:      { dashboard:{view:true,interact:true}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:true}, workstreams:{view:true,interact:true}, settings:{view:true,interact:false} },
+  dev:     { dashboard:{view:true,interact:false}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:false}, workstreams:{view:true,interact:false}, settings:{view:false,interact:false} },
+  viewer:  { dashboard:{view:true,interact:false}, issues:{view:true,interact:false}, kanban:{view:true,interact:false}, gantt:{view:true,interact:false}, workstreams:{view:true,interact:false}, settings:{view:false,interact:false} },
+};
+function initPermissions() {
+  if (DB.permissions) return;
+  try {
+    const saved = localStorage.getItem('flowdesk_permissions');
+    if (saved) { DB.permissions = JSON.parse(saved); return; }
+  } catch(_) {}
+  DB.permissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
+}
+function can(action, page) {
+  // action: 'view' | 'interact'
+  if (!currentUser || !DB.permissions) return false;
+  const role = currentUser.role;
+  return !!(DB.permissions[role]?.[page]?.[action]);
+}
+function canEditIssue(issue) {
+  if (!currentUser) return false;
+  if (currentUser.role === 'viewer') return false;
+  if (!can('interact','issues')) return false;
+  if (currentUser.role === 'admin' || currentUser.role === 'pm') return true;
+  // Devs and others can only edit issues they created
+  return issue && issue.createdBy === currentUser.id;
+}
 
 // ====== SEED SAMPLE ISSUES ======
 function seedIssues() {
+  if (appSeeded || DB.issues.length) return; // fix: never seed twice
+  appSeeded = true;
   const titles = [
     'Fix login page redirect on mobile', 'Implement OAuth2 integration', 'Database query optimization',
     'Design onboarding flow', 'API rate limiting middleware', 'Fix CSV export encoding',
@@ -810,6 +857,8 @@ function seedIssues() {
         { text: 'Implementation', done: false },
         { text: 'Write tests', done: false }
       ],
+      createdBy: DB.users[i % DB.users.length].id,
+      createdByName: DB.users[i % DB.users.length].name,
       created: new Date().toISOString()
     });
   });
@@ -847,6 +896,11 @@ function doLogout() {
 
 // ====== NAVIGATION ======
 function nav(page, el) {
+  // Block navigation to pages the user cannot view
+  if (currentUser && !can('view', page)) {
+    toast('Your role does not have access to that page.', 'error');
+    return;
+  }
   document.querySelectorAll('.page').forEach(p => { p.classList.remove('active'); p.classList.add('hidden'); });
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const pg = document.getElementById('page-' + page);
@@ -864,8 +918,11 @@ function nav(page, el) {
 
 // ====== INIT ======
 function initApp() {
+  initPermissions();
   seedIssues();
+  buildFilterUI();
   populateFilters();
+  applyRoleVisibility();
   renderDashboard();
   updateOpenCount();
 }
@@ -925,63 +982,148 @@ function renderActivity() {
   const feed = document.getElementById('activityFeed');
   const items = [...DB.activity].reverse().slice(0, 8);
   if (!items.length) { feed.innerHTML = '<div class="empty"><div class="empty-sub">No activity yet. Create an issue to get started.</div></div>'; return; }
-  feed.innerHTML = items.map(a => `
+  feed.innerHTML = items.map(a => {
+    const who = a.userName || 'System';
+    const initial = who[0] || '?';
+    return `
     <div class="activity-item">
-      <div class="activity-dot"></div>
-      <div><div class="activity-text">${a.text}</div><div class="activity-time">${a.time}</div></div>
-    </div>`).join('');
+      <div class="activity-user-avatar" title="${escapeHtml(who)}">${escapeHtml(initial)}</div>
+      <div>
+        <div class="activity-text"><span class="activity-user">${escapeHtml(who)}</span> ${escapeHtml(a.text)}</div>
+        <div class="activity-time">${escapeHtml(a.time)}</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function logActivity(text) {
-  DB.activity.push({ text, time: new Date().toLocaleTimeString() + ' ' + new Date().toLocaleDateString() });
+  DB.activity.push({
+    text,
+    userId: currentUser?.id || null,
+    userName: currentUser?.name || 'System',
+    time: new Date().toLocaleTimeString() + ' ' + new Date().toLocaleDateString()
+  });
 }
 
 // ====== ISSUES ======
 const FILTER_SCOPES = ['iss','dash','kan','gan'];
+// ====== MULTI-SELECT FILTERS (per-tab, isolated) ======
+// State: { [scope]: { Type:Set, Status:Set, Priority:Set, Assignee:Set, Workstream:Set } }
+const FILTER_KEYS = ['Type','Status','Priority','Assignee','Workstream'];
+const filterState = {};
+FILTER_SCOPES.forEach(s => { filterState[s] = {}; FILTER_KEYS.forEach(k => filterState[s][k] = new Set()); });
+
+function getFilterOptions(key) {
+  switch(key) {
+    case 'Type': return DB.types.map(t=>t.name);
+    case 'Status': return DB.statuses.map(s=>s.name);
+    case 'Priority': return [...DB.priorities];
+    case 'Assignee': return DB.users.map(u=>u.name);
+    case 'Workstream': return DB.workstreams.map(w=>w.name);
+  }
+  return [];
+}
+
+function buildFilterUI() {
+  const scopeRender = { iss: renderIssues, dash: renderDashboard, kan: renderKanban, gan: renderGantt };
+  FILTER_SCOPES.forEach(scope => {
+    const row = document.getElementById(`${scope}_filterRow`);
+    if (!row) return;
+    row.innerHTML = FILTER_KEYS.map(k => {
+      const id = `${scope}_filter${k}`;
+      return `<div class="filter-multi" id="${id}_wrap">
+        <button type="button" class="filter-multi-btn" id="${id}_btn" onclick="toggleFilterPanel('${scope}','${k}')">
+          <span id="${id}_label">All ${k}s</span>
+          <span class="caret">▾</span>
+        </button>
+        <div class="filter-multi-panel" id="${id}_panel"></div>
+      </div>`;
+    }).join('') + `<button class="btn btn-ghost btn-sm" onclick="clearFilters('${scope}')">Clear</button>`;
+  });
+  // Close on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.filter-multi')) {
+      document.querySelectorAll('.filter-multi-panel.open').forEach(p => p.classList.remove('open'));
+    }
+  });
+}
+
+function toggleFilterPanel(scope, key) {
+  const panel = document.getElementById(`${scope}_filter${key}_panel`);
+  const open = panel.classList.contains('open');
+  document.querySelectorAll('.filter-multi-panel.open').forEach(p => p.classList.remove('open'));
+  if (open) return;
+  // Render options
+  const opts = getFilterOptions(key);
+  const sel = filterState[scope][key];
+  panel.innerHTML = opts.map(o => `
+    <label class="filter-multi-opt">
+      <input type="checkbox" ${sel.has(o)?'checked':''} onchange="onFilterChange('${scope}','${key}','${escapeAttr(o)}', this.checked)">
+      <span>${escapeHtml(o)}</span>
+    </label>`).join('') || `<div style="padding:8px;color:var(--text3);font-size:12px;">No options</div>`;
+  panel.classList.add('open');
+}
+
+function escapeAttr(s) { return String(s).replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+
+function onFilterChange(scope, key, value, checked) {
+  if (checked) filterState[scope][key].add(value); else filterState[scope][key].delete(value);
+  updateFilterLabel(scope, key);
+  rerenderScope(scope);
+}
+
+function updateFilterLabel(scope, key) {
+  const lbl = document.getElementById(`${scope}_filter${key}_label`);
+  if (!lbl) return;
+  const sel = filterState[scope][key];
+  if (sel.size === 0) lbl.textContent = `All ${key}s`;
+  else if (sel.size === 1) lbl.textContent = [...sel][0];
+  else lbl.textContent = `${key} · ${sel.size} selected`;
+}
+
+function rerenderScope(scope) {
+  if (scope==='iss') renderIssues();
+  else if (scope==='dash') renderDashboard();
+  else if (scope==='kan') renderKanban();
+  else if (scope==='gan') renderGantt();
+}
+
+// Refresh option lists when underlying data (types/users/etc.) changes — preserves selections
 function populateFilters() {
   FILTER_SCOPES.forEach(scope => {
-    const setOpts = (id, html) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      const cur = el.value;
-      el.innerHTML = html;
-      el.value = cur;
-    };
-    setOpts(`${scope}_filterType`, `<option value="">All Types</option>` + DB.types.map(t=>`<option value="${t.name}">${t.name}</option>`).join(''));
-    setOpts(`${scope}_filterStatus`, `<option value="">All Statuses</option>` + DB.statuses.map(s=>`<option value="${s.name}">${s.name}</option>`).join(''));
-    setOpts(`${scope}_filterPriority`, `<option value="">All Priorities</option>` + DB.priorities.map(p=>`<option value="${p}">${p}</option>`).join(''));
-    setOpts(`${scope}_filterAssignee`, `<option value="">All Assignees</option>` + DB.users.map(u=>`<option value="${u.name}">${u.name}</option>`).join(''));
-    setOpts(`${scope}_filterWorkstream`, `<option value="">All Workstreams</option>` + DB.workstreams.map(w=>`<option value="${w.name}">${w.name}</option>`).join(''));
+    FILTER_KEYS.forEach(key => {
+      const valid = new Set(getFilterOptions(key));
+      // Drop selections that no longer exist
+      [...filterState[scope][key]].forEach(v => { if (!valid.has(v)) filterState[scope][key].delete(v); });
+      updateFilterLabel(scope, key);
+      // If panel open, re-render its checkboxes by toggling closed then open
+      const panel = document.getElementById(`${scope}_filter${key}_panel`);
+      if (panel?.classList.contains('open')) { panel.classList.remove('open'); toggleFilterPanel(scope, key); }
+    });
   });
 }
 
 function getFilteredIssues(scope) {
   scope = scope || 'iss';
+  const f = filterState[scope] || {};
   let list = [...DB.issues];
-  const st = document.getElementById(`${scope}_filterStatus`)?.value;
-  const pr = document.getElementById(`${scope}_filterPriority`)?.value;
-  const ty = document.getElementById(`${scope}_filterType`)?.value;
-  const as = document.getElementById(`${scope}_filterAssignee`)?.value;
-  const ws = document.getElementById(`${scope}_filterWorkstream`)?.value;
+  const st = f.Status, pr = f.Priority, ty = f.Type, as = f.Assignee, ws = f.Workstream;
+  if (st && st.size) list = list.filter(i => st.has(i.status));
+  if (pr && pr.size) list = list.filter(i => pr.has(i.priority));
+  if (ty && ty.size) list = list.filter(i => ty.has(i.type));
+  if (as && as.size) list = list.filter(i => as.has(i.assignee));
+  if (ws && ws.size) list = list.filter(i => ws.has(i.workstream));
   const gs = document.getElementById('globalSearch')?.value.toLowerCase();
-  if (st) list = list.filter(i => i.status === st);
-  if (pr) list = list.filter(i => i.priority === pr);
-  if (ty) list = list.filter(i => i.type === ty);
-  if (as) list = list.filter(i => i.assignee === as);
-  if (ws) list = list.filter(i => i.workstream === ws);
   if (gs) list = list.filter(i => i.title.toLowerCase().includes(gs) || (i.desc||'').toLowerCase().includes(gs) || String(i.id).includes(gs));
   return list;
 }
 
 function clearFilters(scope) {
-  ['Type','Status','Priority','Assignee','Workstream'].forEach(k => {
-    const el = document.getElementById(`${scope}_filter${k}`);
-    if (el) el.value = '';
+  FILTER_KEYS.forEach(k => {
+    filterState[scope][k].clear();
+    updateFilterLabel(scope, k);
   });
-  if (scope==='iss') renderIssues();
-  else if (scope==='dash') renderDashboard();
-  else if (scope==='kan') renderKanban();
-  else if (scope==='gan') renderGantt();
+  rerenderScope(scope);
 }
 
 function renderIssues() {
@@ -990,9 +1132,10 @@ function renderIssues() {
   if (!tbody) return;
   if (!issues.length) { tbody.innerHTML = `<tr><td colspan="11"><div class="empty"><div class="empty-icon">🗂</div><div class="empty-title">No issues found</div></div></td></tr>`; return; }
   tbody.innerHTML = issues.map(i => {
-    const canEdit = currentUser && (currentUser.role === 'admin' || currentUser.role === 'pm');
+    const canEdit = canEditIssue(i);
+    const canDelete = currentUser?.role === 'admin';
     const labels = (i.labels||[]).map(l => { const lb = DB.labels.find(x=>x.name===l); return `<span class="badge" style="background:${(lb?.color||'#6c63ff')}22;color:${lb?.color||'#6c63ff'};margin:1px;">${l}</span>`; }).join('');
-    return `<tr onclick="canEdit && openEditIssue(${i.id})">
+    return `<tr onclick="${canEdit ? `openEditIssue(${i.id})` : ''}">
       <td class="mono" style="color:var(--text3);font-size:11px;">#${i.id}</td>
       <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;">${i.title}</td>
       <td><span class="badge badge-${i.type.toLowerCase()}">${i.type}</span></td>
@@ -1006,7 +1149,7 @@ function renderIssues() {
       <td onclick="event.stopPropagation()">
         <div style="display:flex;gap:4px;">
           ${canEdit ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="openEditIssue(${i.id})" title="Edit">✏️</button>` : ''}
-          ${currentUser?.role==='admin' ? `<button class="btn btn-danger btn-sm btn-icon" onclick="deleteIssue(${i.id})" title="Delete">🗑</button>` : ''}
+          ${canDelete ? `<button class="btn btn-danger btn-sm btn-icon" onclick="deleteIssue(${i.id})" title="Delete">🗑</button>` : ''}
         </div>
       </td>
     </tr>`;
@@ -1037,7 +1180,7 @@ function populateIssueDropdowns() {
 }
 
 function openNewIssue() {
-  if (currentUser?.role === 'viewer') { toast('You do not have permission to create issues.', 'error'); return; }
+  if (!can('interact','issues')) { toast('You do not have permission to create issues.', 'error'); return; }
   editingIssueId = null;
   document.getElementById('issueModalTitle').textContent = 'New Issue';
   document.getElementById('issueId').value = '';
@@ -1053,6 +1196,7 @@ function openNewIssue() {
 function openEditIssue(id) {
   const issue = DB.issues.find(i => i.id === id);
   if (!issue) return;
+  if (!canEditIssue(issue)) { toast('You can only edit issues you created.', 'error'); return; }
   editingIssueId = id;
   document.getElementById('issueModalTitle').textContent = 'Edit Issue #' + id;
   document.getElementById('issueId').value = id;
@@ -1104,6 +1248,13 @@ function getChecklistFromDOM() { return modalChecklist.map(c => ({ text: c.text,
 function saveIssue() {
   const title = document.getElementById('issueTitle').value.trim();
   if (!title) { toast('Issue title is required.', 'error'); return; }
+  // Authorization gate
+  if (editingIssueId) {
+    const existing = DB.issues.find(i => i.id === editingIssueId);
+    if (!canEditIssue(existing)) { toast('You do not have permission to edit this issue.', 'error'); return; }
+  } else if (!can('interact','issues')) {
+    toast('You do not have permission to create issues.', 'error'); return;
+  }
   const labels = [...document.getElementById('issueLabels').selectedOptions].map(o=>o.value);
   const data = {
     title,
@@ -1125,7 +1276,7 @@ function saveIssue() {
     logActivity(`Updated issue #${editingIssueId}: ${title}`);
     toast('Issue updated successfully', 'success');
   } else {
-    const issue = { id: DB.nextIssueId++, ...data };
+    const issue = { id: DB.nextIssueId++, ...data, createdBy: currentUser?.id || null, createdByName: currentUser?.name || 'System' };
     DB.issues.push(issue);
     logActivity(`Created issue #${issue.id}: ${title}`);
     toast('Issue created successfully', 'success');
@@ -1150,25 +1301,27 @@ let dragIssueId = null;
 function renderKanban() {
   const board = document.getElementById('kanbanBoard');
   const issues = getFilteredIssues('kan');
+  const canInteract = can('interact','kanban');
   board.innerHTML = DB.statuses.map(s => {
     const cols = issues.filter(i => i.status === s.name);
     return `
-    <div class="kanban-col" data-status="${s.name}" ondrop="dropCard(event,'${s.name}')" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')">
+    <div class="kanban-col" data-status="${s.name}" ${canInteract ? `ondrop="dropCard(event,'${s.name}')" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')"` : ''}>
       <div class="kanban-col-header">
         <div class="kanban-col-title" style="color:${s.color}">${s.name}</div>
         <div class="kanban-col-count">${cols.length}</div>
       </div>
       <div class="kanban-cards">
-        ${cols.map(i => kanbanCard(i)).join('')}
-        ${currentUser?.role !== 'viewer' ? `<button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:4px;" onclick="openNewIssue()">+ Add</button>` : ''}
+        ${cols.map(i => kanbanCard(i, canInteract)).join('')}
+        ${canInteract && can('interact','issues') ? `<button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:4px;" onclick="openNewIssue()">+ Add</button>` : ''}
       </div>
     </div>`;
   }).join('');
 }
 
-function kanbanCard(i) {
+function kanbanCard(i, canDrag) {
   const prioColors = { Critical:'var(--critical)', High:'var(--high)', Medium:'var(--medium)', Low:'var(--low)' };
-  return `<div class="kanban-card" draggable="true" ondragstart="dragStart(event,${i.id})" ondragend="dragEnd(event)" onclick="openEditIssue(${i.id})">
+  const editable = canEditIssue(i);
+  return `<div class="kanban-card" ${canDrag?'draggable="true"':''} ${canDrag?`ondragstart="dragStart(event,${i.id})" ondragend="dragEnd(event)"`:''} ${editable?`onclick="openEditIssue(${i.id})"`:''} style="${!canDrag?'cursor:default;':''}">
     <div class="kanban-card-title">${i.title}</div>
     <div class="kanban-card-meta">
       <span class="badge badge-${i.type.toLowerCase()}" style="font-size:10px;">${i.type}</span>
@@ -1181,6 +1334,7 @@ function kanbanCard(i) {
 }
 
 function dragStart(event, id) {
+  if (!can('interact','kanban')) { event.preventDefault(); return; }
   dragIssueId = id;
   event.target.classList.add('dragging');
   event.dataTransfer.effectAllowed = 'move';
@@ -1189,6 +1343,7 @@ function dragEnd(event) { event.target.classList.remove('dragging'); document.qu
 function dropCard(event, status) {
   event.preventDefault();
   event.currentTarget.classList.remove('drag-over');
+  if (!can('interact','kanban')) { dragIssueId=null; toast('You do not have permission to move cards.', 'error'); return; }
   if (!dragIssueId) return;
   const issue = DB.issues.find(i => i.id === dragIssueId);
   if (issue) { issue.status = status; logActivity(`Moved #${issue.id} to ${status}`); updateOpenCount(); renderKanban(); toast(`Moved to ${status}`, 'info'); }
@@ -1330,10 +1485,11 @@ function settingsTab(tab, el) {
   document.getElementById('settings-'+tab).classList.remove('hidden');
   el.classList.add('active');
   if (tab==='users') renderUsers();
+  if (tab==='permissions') renderPermissions();
 }
 
 function renderSettings() {
-  renderTypeList(); renderPriorityList(); renderLabelList(); renderStatusList(); renderUsers();
+  renderTypeList(); renderPriorityList(); renderLabelList(); renderStatusList(); renderUsers(); renderPermissions();
 }
 
 function renderTypeList() {
@@ -1382,6 +1538,9 @@ function removeStatus(i) { DB.statuses.splice(i,1); renderStatusList(); populate
 function renderUsers() {
   const tbody = document.getElementById('usersTbody');
   if (!tbody) return;
+  // Gate "Add User" by admin role only
+  const addBtn = document.getElementById('addUserBtn');
+  if (addBtn) addBtn.style.display = (currentUser?.role === 'admin') ? '' : 'none';
   tbody.innerHTML = DB.users.map(u => `<tr>
     <td><div style="display:flex;align-items:center;gap:8px;"><div class="avatar" style="width:28px;height:28px;font-size:11px;background:var(--accent);">${u.name[0]}</div>${u.name}</div></td>
     <td class="mono" style="font-size:12px;">${u.username}</td>
@@ -1396,6 +1555,7 @@ function renderUsers() {
 }
 
 function openUserModal(id) {
+  if (currentUser?.role !== 'admin') { toast('Only admins can manage users.', 'error'); return; }
   editingUserId = id || null;
   if (id) {
     const u = DB.users.find(x=>x.id===id);
@@ -1443,6 +1603,82 @@ function deleteUser(id) {
   if (!confirm('Delete this user?')) return;
   DB.users = DB.users.filter(u=>u.id!==id);
   renderUsers(); toast('User deleted','info');
+}
+
+// ====== ROLES & PERMISSIONS ======
+const PAGE_LABELS = { dashboard:'Dashboard', issues:'Issues', kanban:'Kanban', gantt:'Gantt', workstreams:'Workstreams', settings:'Settings' };
+const ROLE_LABELS = { admin:'Admin', pm:'Project Manager', dev:'Developer', viewer:'Viewer' };
+
+function renderPermissions() {
+  initPermissions();
+  const table = document.getElementById('permTable');
+  if (!table) return;
+  const isAdmin = currentUser?.role === 'admin';
+  const saveBtn = document.getElementById('savePermBtn');
+  if (saveBtn) saveBtn.style.display = isAdmin ? '' : 'none';
+  let html = '<thead><tr><th>Tab / Page</th>';
+  PERM_ROLES.forEach(r => { html += `<th>${ROLE_LABELS[r]}</th>`; });
+  html += '</tr></thead><tbody>';
+  PERM_PAGES.forEach(page => {
+    html += `<tr><td><b>${PAGE_LABELS[page]}</b></td>`;
+    PERM_ROLES.forEach(role => {
+      const p = DB.permissions[role][page];
+      // Viewer locked out of certain interacts (cannot edit kanban / users)
+      const viewerLockInteract = (role === 'viewer' && (page === 'kanban' || page === 'settings'));
+      const adminLock = (role === 'admin'); // Admin always full
+      const dis = isAdmin && !adminLock && !viewerLockInteract ? '' : 'disabled';
+      const disV = isAdmin && !adminLock ? '' : 'disabled';
+      html += `<td><div class="perm-cell">
+        <label><input type="checkbox" ${p.view?'checked':''} ${disV} onchange="updatePerm('${role}','${page}','view',this.checked)">View</label>
+        <label><input type="checkbox" ${p.interact?'checked':''} ${dis} onchange="updatePerm('${role}','${page}','interact',this.checked)">Interact</label>
+      </div></td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+function updatePerm(role, page, action, val) {
+  if (currentUser?.role !== 'admin') return;
+  if (role === 'admin') return; // Admin always full
+  if (!DB.permissions[role][page]) DB.permissions[role][page] = { view:false, interact:false };
+  DB.permissions[role][page][action] = !!val;
+  // Cannot interact without viewing
+  if (action === 'view' && !val) DB.permissions[role][page].interact = false;
+  if (action === 'interact' && val) DB.permissions[role][page].view = true;
+  renderPermissions();
+}
+
+function savePermissions() {
+  if (currentUser?.role !== 'admin') { toast('Only admins can change permissions.', 'error'); return; }
+  try { localStorage.setItem('flowdesk_permissions', JSON.stringify(DB.permissions)); } catch(_) {}
+  applyRoleVisibility();
+  toast('Permissions saved', 'success');
+}
+
+function resetPermissions() {
+  if (currentUser?.role !== 'admin') return;
+  if (!confirm('Reset all role permissions to defaults?')) return;
+  DB.permissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
+  try { localStorage.setItem('flowdesk_permissions', JSON.stringify(DB.permissions)); } catch(_) {}
+  applyRoleVisibility();
+  renderPermissions();
+  toast('Permissions reset', 'info');
+}
+
+// Hide nav items for pages the current user cannot view
+function applyRoleVisibility() {
+  const navMap = { dashboard:0, issues:1, kanban:2, gantt:3, workstreams:4, settings:5 };
+  const items = document.querySelectorAll('.sidebar .nav-item');
+  Object.entries(navMap).forEach(([page, idx]) => {
+    const item = items[idx];
+    if (!item) return;
+    item.style.display = can('view', page) ? '' : 'none';
+  });
+  // Hide "+ New Issue" if no interact on issues
+  const newBtn = document.querySelector('.topbar .btn-primary');
+  if (newBtn) newBtn.style.display = can('interact','issues') ? '' : 'none';
 }
 
 // ====== EXCEL IMPORT/EXPORT ======
