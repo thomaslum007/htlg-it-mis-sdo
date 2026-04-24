@@ -896,6 +896,11 @@ function doLogout() {
 
 // ====== NAVIGATION ======
 function nav(page, el) {
+  // Block navigation to pages the user cannot view
+  if (currentUser && !can('view', page)) {
+    toast('Your role does not have access to that page.', 'error');
+    return;
+  }
   document.querySelectorAll('.page').forEach(p => { p.classList.remove('active'); p.classList.add('hidden'); });
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const pg = document.getElementById('page-' + page);
