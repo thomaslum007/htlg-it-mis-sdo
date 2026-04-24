@@ -448,14 +448,7 @@ textarea { resize: vertical; min-height: 80px; }
   <div class="content page hidden" id="page-issues">
     <div class="filter-bar">
       <div class="filter-title">Filters</div>
-      <div class="filter-row">
-        <select id="iss_filterType" onchange="renderIssues()" style="width:auto;"><option value="">All Types</option></select>
-        <select id="iss_filterStatus" onchange="renderIssues()" style="width:auto;"><option value="">All Statuses</option></select>
-        <select id="iss_filterPriority" onchange="renderIssues()" style="width:auto;"><option value="">All Priorities</option></select>
-        <select id="iss_filterAssignee" onchange="renderIssues()" style="width:auto;"><option value="">All Assignees</option></select>
-        <select id="iss_filterWorkstream" onchange="renderIssues()" style="width:auto;"><option value="">All Workstreams</option></select>
-        <button class="btn btn-ghost btn-sm" onclick="clearFilters('iss')">Clear</button>
-      </div>
+      <div class="filter-row" id="iss_filterRow"></div>
     </div>
     <div class="card" style="padding:0;overflow:hidden;">
       <div class="table-wrap">
