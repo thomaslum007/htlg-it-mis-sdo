@@ -1073,44 +1073,34 @@ function openEditIssue(id) {
   document.getElementById('issueModal').classList.remove('hidden');
 }
 
+// Working checklist — held in module-level array, single source of truth
+let modalChecklist = [];
 function renderChecklist(items) {
+  modalChecklist = (items || []).map(c => ({ text: c.text, done: !!c.done }));
+  drawChecklist();
+}
+function drawChecklist() {
   const el = document.getElementById('checklistItems');
-  el.innerHTML = items.map((c, i) => `
-    <div class="check-item" id="chk-${i}">
-      <input type="checkbox" ${c.done?'checked':''} onchange="toggleCheck(${i})">
-      <span class="check-item-text ${c.done?'done':''}" id="chktext-${i}">${c.text}</span>
+  el.innerHTML = modalChecklist.map((c, i) => `
+    <div class="check-item" data-idx="${i}">
+      <input type="checkbox" ${c.done?'checked':''} onchange="toggleCheck(${i}, this.checked)">
+      <span class="check-item-text ${c.done?'done':''}">${escapeHtml(c.text)}</span>
       <button class="check-item-remove" onclick="removeCheck(${i})">✕</button>
     </div>`).join('');
 }
-
-function toggleCheck(i) {
-  const items = getChecklistFromDOM();
-  items[i].done = !items[i].done;
-  renderChecklist(items);
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toggleCheck(i, checked) {
+  if (modalChecklist[i]) { modalChecklist[i].done = !!checked; drawChecklist(); }
 }
-
-function removeCheck(i) {
-  const items = getChecklistFromDOM();
-  items.splice(i, 1);
-  renderChecklist(items);
-}
-
+function removeCheck(i) { modalChecklist.splice(i, 1); drawChecklist(); }
 function addCheckItem() {
   const inp = document.getElementById('newCheckItem');
   if (!inp.value.trim()) return;
-  const items = getChecklistFromDOM();
-  items.push({ text: inp.value.trim(), done: false });
-  renderChecklist(items);
+  modalChecklist.push({ text: inp.value.trim(), done: false });
+  drawChecklist();
   inp.value = '';
 }
-
-function getChecklistFromDOM() {
-  const el = document.getElementById('checklistItems');
-  return [...el.querySelectorAll('.check-item')].map((row, i) => ({
-    text: document.getElementById('chktext-' + i)?.textContent || '',
-    done: row.querySelector('input[type=checkbox]')?.checked || false
-  }));
-}
+function getChecklistFromDOM() { return modalChecklist.map(c => ({ text: c.text, done: !!c.done })); }
 
 function saveIssue() {
   const title = document.getElementById('issueTitle').value.trim();
