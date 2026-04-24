@@ -1127,9 +1127,10 @@ function renderIssues() {
   if (!tbody) return;
   if (!issues.length) { tbody.innerHTML = `<tr><td colspan="11"><div class="empty"><div class="empty-icon">🗂</div><div class="empty-title">No issues found</div></div></td></tr>`; return; }
   tbody.innerHTML = issues.map(i => {
-    const canEdit = currentUser && (currentUser.role === 'admin' || currentUser.role === 'pm');
+    const canEdit = canEditIssue(i);
+    const canDelete = currentUser?.role === 'admin';
     const labels = (i.labels||[]).map(l => { const lb = DB.labels.find(x=>x.name===l); return `<span class="badge" style="background:${(lb?.color||'#6c63ff')}22;color:${lb?.color||'#6c63ff'};margin:1px;">${l}</span>`; }).join('');
-    return `<tr onclick="canEdit && openEditIssue(${i.id})">
+    return `<tr onclick="${canEdit ? `openEditIssue(${i.id})` : ''}">
       <td class="mono" style="color:var(--text3);font-size:11px;">#${i.id}</td>
       <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;">${i.title}</td>
       <td><span class="badge badge-${i.type.toLowerCase()}">${i.type}</span></td>
@@ -1143,7 +1144,7 @@ function renderIssues() {
       <td onclick="event.stopPropagation()">
         <div style="display:flex;gap:4px;">
           ${canEdit ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="openEditIssue(${i.id})" title="Edit">✏️</button>` : ''}
-          ${currentUser?.role==='admin' ? `<button class="btn btn-danger btn-sm btn-icon" onclick="deleteIssue(${i.id})" title="Delete">🗑</button>` : ''}
+          ${canDelete ? `<button class="btn btn-danger btn-sm btn-icon" onclick="deleteIssue(${i.id})" title="Delete">🗑</button>` : ''}
         </div>
       </td>
     </tr>`;
