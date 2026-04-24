@@ -1485,10 +1485,11 @@ function settingsTab(tab, el) {
   document.getElementById('settings-'+tab).classList.remove('hidden');
   el.classList.add('active');
   if (tab==='users') renderUsers();
+  if (tab==='permissions') renderPermissions();
 }
 
 function renderSettings() {
-  renderTypeList(); renderPriorityList(); renderLabelList(); renderStatusList(); renderUsers();
+  renderTypeList(); renderPriorityList(); renderLabelList(); renderStatusList(); renderUsers(); renderPermissions();
 }
 
 function renderTypeList() {
