@@ -829,6 +829,7 @@ function doLogin() {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('app').style.display = 'flex';
+  document.body.classList.remove('login-mode');
   document.getElementById('sidebarUsername').textContent = user.name;
   document.getElementById('sidebarRole').textContent = user.role.toUpperCase();
   document.getElementById('sidebarAvatar').textContent = user.name[0];
@@ -838,6 +839,7 @@ function doLogout() {
   currentUser = null;
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
+  document.body.classList.add('login-mode');
   document.getElementById('loginUser').value = '';
   document.getElementById('loginPass').value = '';
   document.getElementById('loginError').style.display = 'none';
