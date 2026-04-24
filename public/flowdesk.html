@@ -1243,6 +1243,13 @@ function getChecklistFromDOM() { return modalChecklist.map(c => ({ text: c.text,
 function saveIssue() {
   const title = document.getElementById('issueTitle').value.trim();
   if (!title) { toast('Issue title is required.', 'error'); return; }
+  // Authorization gate
+  if (editingIssueId) {
+    const existing = DB.issues.find(i => i.id === editingIssueId);
+    if (!canEditIssue(existing)) { toast('You do not have permission to edit this issue.', 'error'); return; }
+  } else if (!can('interact','issues')) {
+    toast('You do not have permission to create issues.', 'error'); return;
+  }
   const labels = [...document.getElementById('issueLabels').selectedOptions].map(o=>o.value);
   const data = {
     title,
@@ -1264,7 +1271,7 @@ function saveIssue() {
     logActivity(`Updated issue #${editingIssueId}: ${title}`);
     toast('Issue updated successfully', 'success');
   } else {
-    const issue = { id: DB.nextIssueId++, ...data };
+    const issue = { id: DB.nextIssueId++, ...data, createdBy: currentUser?.id || null, createdByName: currentUser?.name || 'System' };
     DB.issues.push(issue);
     logActivity(`Created issue #${issue.id}: ${title}`);
     toast('Issue created successfully', 'success');
