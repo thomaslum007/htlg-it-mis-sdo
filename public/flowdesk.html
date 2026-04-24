@@ -1555,6 +1555,7 @@ function renderUsers() {
 }
 
 function openUserModal(id) {
+  if (currentUser?.role !== 'admin') { toast('Only admins can manage users.', 'error'); return; }
   editingUserId = id || null;
   if (id) {
     const u = DB.users.find(x=>x.id===id);
