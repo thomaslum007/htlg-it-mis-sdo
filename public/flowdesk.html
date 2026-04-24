@@ -1538,6 +1538,9 @@ function removeStatus(i) { DB.statuses.splice(i,1); renderStatusList(); populate
 function renderUsers() {
   const tbody = document.getElementById('usersTbody');
   if (!tbody) return;
+  // Gate "Add User" by admin role only
+  const addBtn = document.getElementById('addUserBtn');
+  if (addBtn) addBtn.style.display = (currentUser?.role === 'admin') ? '' : 'none';
   tbody.innerHTML = DB.users.map(u => `<tr>
     <td><div style="display:flex;align-items:center;gap:8px;"><div class="avatar" style="width:28px;height:28px;font-size:11px;background:var(--accent);">${u.name[0]}</div>${u.name}</div></td>
     <td class="mono" style="font-size:12px;">${u.username}</td>
