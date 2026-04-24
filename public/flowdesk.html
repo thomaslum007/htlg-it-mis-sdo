@@ -1296,25 +1296,27 @@ let dragIssueId = null;
 function renderKanban() {
   const board = document.getElementById('kanbanBoard');
   const issues = getFilteredIssues('kan');
+  const canInteract = can('interact','kanban');
   board.innerHTML = DB.statuses.map(s => {
     const cols = issues.filter(i => i.status === s.name);
     return `
-    <div class="kanban-col" data-status="${s.name}" ondrop="dropCard(event,'${s.name}')" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')">
+    <div class="kanban-col" data-status="${s.name}" ${canInteract ? `ondrop="dropCard(event,'${s.name}')" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')"` : ''}>
       <div class="kanban-col-header">
         <div class="kanban-col-title" style="color:${s.color}">${s.name}</div>
         <div class="kanban-col-count">${cols.length}</div>
       </div>
       <div class="kanban-cards">
-        ${cols.map(i => kanbanCard(i)).join('')}
-        ${currentUser?.role !== 'viewer' ? `<button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:4px;" onclick="openNewIssue()">+ Add</button>` : ''}
+        ${cols.map(i => kanbanCard(i, canInteract)).join('')}
+        ${canInteract && can('interact','issues') ? `<button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:4px;" onclick="openNewIssue()">+ Add</button>` : ''}
       </div>
     </div>`;
   }).join('');
 }
 
-function kanbanCard(i) {
+function kanbanCard(i, canDrag) {
   const prioColors = { Critical:'var(--critical)', High:'var(--high)', Medium:'var(--medium)', Low:'var(--low)' };
-  return `<div class="kanban-card" draggable="true" ondragstart="dragStart(event,${i.id})" ondragend="dragEnd(event)" onclick="openEditIssue(${i.id})">
+  const editable = canEditIssue(i);
+  return `<div class="kanban-card" ${canDrag?'draggable="true"':''} ${canDrag?`ondragstart="dragStart(event,${i.id})" ondragend="dragEnd(event)"`:''} ${editable?`onclick="openEditIssue(${i.id})"`:''} style="${!canDrag?'cursor:default;':''}">
     <div class="kanban-card-title">${i.title}</div>
     <div class="kanban-card-meta">
       <span class="badge badge-${i.type.toLowerCase()}" style="font-size:10px;">${i.type}</span>
@@ -1327,6 +1329,7 @@ function kanbanCard(i) {
 }
 
 function dragStart(event, id) {
+  if (!can('interact','kanban')) { event.preventDefault(); return; }
   dragIssueId = id;
   event.target.classList.add('dragging');
   event.dataTransfer.effectAllowed = 'move';
@@ -1335,6 +1338,7 @@ function dragEnd(event) { event.target.classList.remove('dragging'); document.qu
 function dropCard(event, status) {
   event.preventDefault();
   event.currentTarget.classList.remove('drag-over');
+  if (!can('interact','kanban')) { dragIssueId=null; toast('You do not have permission to move cards.', 'error'); return; }
   if (!dragIssueId) return;
   const issue = DB.issues.find(i => i.id === dragIssueId);
   if (issue) { issue.status = status; logActivity(`Moved #${issue.id} to ${status}`); updateOpenCount(); renderKanban(); toast(`Moved to ${status}`, 'info'); }
