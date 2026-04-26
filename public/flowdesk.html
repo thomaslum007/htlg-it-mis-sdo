@@ -343,6 +343,28 @@ textarea { resize: vertical; min-height: 80px; }
 .perm-cell { display: inline-flex; gap: 4px; }
 .perm-cell label { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-family: var(--mono); color: var(--text2); text-transform: none; letter-spacing: 0; cursor: pointer; margin: 0; }
 .perm-cell input { accent-color: var(--accent); cursor: pointer; }
+/* Collapsible sidebar */
+body.sidebar-collapsed { --sidebar-w: 64px; }
+body.sidebar-collapsed .nav-label,
+body.sidebar-collapsed .logo-text,
+body.sidebar-collapsed .logo-sub,
+body.sidebar-collapsed .user-info,
+body.sidebar-collapsed .nav-item span:not(.icon):not(.nav-badge),
+body.sidebar-collapsed .sidebar-footer .btn-ghost { display: none; }
+body.sidebar-collapsed .nav-item { justify-content: center; padding: 8px; }
+body.sidebar-collapsed .nav-item .nav-badge { position: absolute; top: 2px; right: 2px; }
+body.sidebar-collapsed .nav-item { position: relative; }
+body.sidebar-collapsed .logo { padding: 16px 8px; text-align: center; }
+body.sidebar-collapsed .logo-mark { justify-content: center; }
+body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
+.sidebar-toggle { background: var(--surface2); border: 1px solid var(--border); color: var(--text2); width: 28px; height: 28px; border-radius: var(--radius); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; }
+.sidebar-toggle:hover { background: var(--surface3); color: var(--text); }
+/* Dashboard segments editor */
+.seg-editor { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.seg-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+.seg-card h4 { font-size: 12px; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--text2); }
+.seg-opts label { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; cursor: pointer; text-transform: none; letter-spacing: 0; font-family: var(--font); margin: 0; color: var(--text); }
+.seg-opts input { accent-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -386,18 +408,19 @@ textarea { resize: vertical; min-height: 80px; }
   <div class="nav">
     <div class="nav-section">
       <div class="nav-label">Overview</div>
-      <button class="nav-item active" onclick="nav('dashboard',this)"><span class="icon">📊</span>Dashboard</button>
-      <button class="nav-item" onclick="nav('issues',this)"><span class="icon">🗂</span>Issues <span class="nav-badge" id="openCount">0</span></button>
-      <button class="nav-item" onclick="nav('kanban',this)"><span class="icon">📋</span>Kanban</button>
-      <button class="nav-item" onclick="nav('gantt',this)"><span class="icon">📅</span>Gantt Chart</button>
+      <button class="nav-item active" onclick="nav('dashboard',this)"><span class="icon">📊</span><span>Dashboard</span></button>
+      <button class="nav-item" onclick="nav('issues',this)"><span class="icon">🗂</span><span>Issues</span> <span class="nav-badge" id="openCount">0</span></button>
+      <button class="nav-item" onclick="nav('kanban',this)"><span class="icon">📋</span><span>Kanban</span></button>
+      <button class="nav-item" onclick="nav('gantt',this)"><span class="icon">📅</span><span>Gantt Chart</span></button>
     </div>
     <div class="nav-section">
       <div class="nav-label">Team</div>
-      <button class="nav-item" onclick="nav('workstreams',this)"><span class="icon">🏗</span>Workstreams</button>
+      <button class="nav-item" onclick="nav('focus',this)"><span class="icon">🎯</span><span>Focus</span> <span class="nav-badge" id="focusCount">0</span></button>
+      <button class="nav-item" onclick="nav('workstreams',this)"><span class="icon">🏗</span><span>Workstreams</span></button>
     </div>
     <div class="nav-section">
       <div class="nav-label">Config</div>
-      <button class="nav-item" onclick="nav('settings',this)"><span class="icon">⚙️</span>Settings</button>
+      <button class="nav-item" onclick="nav('settings',this)"><span class="icon">⚙️</span><span>Settings</span></button>
     </div>
   </div>
   <div class="sidebar-footer">
@@ -418,13 +441,14 @@ textarea { resize: vertical; min-height: 80px; }
   <!-- TOPBAR -->
   <div class="topbar">
     <div class="topbar-left">
+      <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle sidebar">☰</button>
       <div class="page-title" id="pageTitle">Dashboard</div>
     </div>
     <div class="topbar-right">
       <input class="search-input" id="globalSearch" placeholder="🔍  Search issues..." oninput="globalSearchHandler(this.value)">
       <button class="btn btn-primary" onclick="openNewIssue()">+ New Issue</button>
       <button class="btn btn-ghost btn-sm" onclick="exportExcel()" title="Export Excel">📤 Export</button>
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importFile').click()" title="Import Excel">📥 Import</button>
+      <button class="btn btn-ghost btn-sm" id="importBtn" onclick="triggerImport()" title="Import Excel (admin only)">📥 Import</button>
       <input type="file" id="importFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importExcel(this)">
       <button class="btn btn-ghost btn-sm btn-icon" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
     </div>
@@ -474,6 +498,27 @@ textarea { resize: vertical; min-height: 80px; }
     </div>
   </div>
 
+  <!-- FOCUS (only items assigned to me) -->
+  <div class="content page hidden" id="page-focus">
+    <div class="filter-bar">
+      <div class="filter-title">Filters</div>
+      <div class="filter-row" id="focus_filterRow"></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Title</th><th>Type</th><th>Status</th><th>Priority</th>
+              <th>Workstream</th><th>Start</th><th>End</th><th>Labels</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="focusTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- KANBAN -->
   <div class="content page hidden" id="page-kanban">
     <div class="filter-bar">
@@ -511,6 +556,7 @@ textarea { resize: vertical; min-height: 80px; }
       <div class="tab" onclick="settingsTab('labels',this)">Labels</div>
       <div class="tab" onclick="settingsTab('statuses',this)">Statuses</div>
       <div class="tab" onclick="settingsTab('users',this)">Users</div>
+      <div class="tab" onclick="settingsTab('dashboard',this)">Dashboard</div>
       <div class="tab" onclick="settingsTab('permissions',this)">Roles &amp; Permissions</div>
     </div>
     <div id="settings-general" class="settings-content">
@@ -563,6 +609,16 @@ textarea { resize: vertical; min-height: 80px; }
         <div class="table-wrap">
           <table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Department</th><th>Actions</th></tr></thead>
           <tbody id="usersTbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+    <div id="settings-dashboard" class="settings-content hidden">
+      <div class="settings-section">
+        <div class="settings-title">Dashboard Segments</div>
+        <div class="settings-desc">Choose which statuses count toward each Dashboard KPI. <b>Admin only.</b></div>
+        <div class="seg-editor" id="segEditor"></div>
+        <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;">
+          <button class="btn btn-primary btn-sm" id="saveSegBtn" onclick="saveDashboardSegments()">Save Segments</button>
         </div>
       </div>
     </div>
@@ -1081,14 +1137,30 @@ function nav(page, el) {
   const pg = document.getElementById('page-' + page);
   if (pg) { pg.classList.remove('hidden'); pg.classList.add('active'); }
   if (el) el.classList.add('active');
-  const titles = { dashboard:'Dashboard', issues:'Issues', kanban:'Kanban Board', gantt:'Gantt Chart', workstreams:'Workstreams', settings:'Settings' };
+  const titles = { dashboard:'Dashboard', issues:'Issues', kanban:'Kanban Board', gantt:'Gantt Chart', focus:'Focus', workstreams:'Workstreams', settings:'Settings' };
   document.getElementById('pageTitle').textContent = titles[page] || page;
   if (page === 'dashboard') renderDashboard();
   if (page === 'issues') renderIssues();
   if (page === 'kanban') renderKanban();
   if (page === 'gantt') renderGantt();
+  if (page === 'focus') renderFocus();
   if (page === 'workstreams') renderWorkstreams();
   if (page === 'settings') renderSettings();
+}
+
+// ====== SIDEBAR COLLAPSE ======
+function toggleSidebar() {
+  const collapsed = document.body.classList.toggle('sidebar-collapsed');
+  try { localStorage.setItem('flowdesk_sidebar', collapsed ? '1' : '0'); } catch(_){}
+}
+(function initSidebarPref() {
+  try { if (localStorage.getItem('flowdesk_sidebar') === '1') document.body.classList.add('sidebar-collapsed'); } catch(_){}
+})();
+
+// ====== IMPORT GATING (admin only) ======
+function triggerImport() {
+  if (currentUser?.role !== 'admin') { toast('Only admins can import.', 'error'); return; }
+  document.getElementById('importFile').click();
 }
 
 // ====== INIT ======
@@ -1099,8 +1171,11 @@ async function initApp() {
   buildFilterUI();
   populateFilters();
   applyRoleVisibility();
-  renderDashboard();
+  // Default landing tab is Dashboard
+  const dashNav = document.querySelector('.sidebar .nav-item');
+  nav('dashboard', dashNav);
   updateOpenCount();
+  updateFocusCount();
   Cloud.subscribe(cloudHandleChange);
 }
 
@@ -1186,10 +1261,10 @@ function logActivity(text) {
 }
 
 // ====== ISSUES ======
-const FILTER_SCOPES = ['iss','dash','kan','gan'];
+const FILTER_SCOPES = ['iss','dash','kan','gan','focus'];
 // ====== MULTI-SELECT FILTERS (per-tab, isolated) ======
 // State: { [scope]: { Type:Set, Status:Set, Priority:Set, Assignee:Set, Workstream:Set } }
-const FILTER_KEYS = ['Type','Status','Priority','Assignee','Workstream'];
+const FILTER_KEYS = ['Type','Status','Priority','Assignee','Workstream','Labels'];
 const filterState = {};
 FILTER_SCOPES.forEach(s => { filterState[s] = {}; FILTER_KEYS.forEach(k => filterState[s][k] = new Set()); });
 
@@ -1200,12 +1275,13 @@ function getFilterOptions(key) {
     case 'Priority': return [...DB.priorities];
     case 'Assignee': return DB.users.map(u=>u.name);
     case 'Workstream': return DB.workstreams.map(w=>w.name);
+    case 'Labels': return DB.labels.map(l => typeof l==='string' ? l : l.name);
   }
   return [];
 }
 
 function buildFilterUI() {
-  const scopeRender = { iss: renderIssues, dash: renderDashboard, kan: renderKanban, gan: renderGantt };
+  const scopeRender = { iss: renderIssues, dash: renderDashboard, kan: renderKanban, gan: renderGantt, focus: renderFocus };
   FILTER_SCOPES.forEach(scope => {
     const row = document.getElementById(`${scope}_filterRow`);
     if (!row) return;
@@ -1266,6 +1342,7 @@ function rerenderScope(scope) {
   else if (scope==='dash') renderDashboard();
   else if (scope==='kan') renderKanban();
   else if (scope==='gan') renderGantt();
+  else if (scope==='focus') renderFocus();
 }
 
 // Refresh option lists when underlying data (types/users/etc.) changes — preserves selections
@@ -1287,12 +1364,13 @@ function getFilteredIssues(scope) {
   scope = scope || 'iss';
   const f = filterState[scope] || {};
   let list = [...DB.issues];
-  const st = f.Status, pr = f.Priority, ty = f.Type, as = f.Assignee, ws = f.Workstream;
+  const st = f.Status, pr = f.Priority, ty = f.Type, as = f.Assignee, ws = f.Workstream, lb = f.Labels;
   if (st && st.size) list = list.filter(i => st.has(i.status));
   if (pr && pr.size) list = list.filter(i => pr.has(i.priority));
   if (ty && ty.size) list = list.filter(i => ty.has(i.type));
   if (as && as.size) list = list.filter(i => as.has(i.assignee));
   if (ws && ws.size) list = list.filter(i => ws.has(i.workstream));
+  if (lb && lb.size) list = list.filter(i => (i.labels||[]).some(l => lb.has(l)));
   const gs = document.getElementById('globalSearch')?.value.toLowerCase();
   if (gs) list = list.filter(i => i.title.toLowerCase().includes(gs) || (i.desc||'').toLowerCase().includes(gs) || String(i.id).includes(gs));
   return list;
@@ -1614,8 +1692,8 @@ function renderWorkstreams() {
           <div style="font-size:12px;color:var(--text3);margin-top:2px;font-family:var(--mono);">${w.dept}</div>
         </div>
         <div style="display:flex;gap:6px;">
-          ${currentUser?.role==='admin' ? `<button class="btn btn-ghost btn-sm" onclick="openWorkstreamModal('${w.id}')">Edit</button>` : ''}
-          ${currentUser?.role==='admin' ? `<button class="btn btn-danger btn-sm" onclick="deleteWorkstream('${w.id}')">Delete</button>` : ''}
+          ${can('interact','workstreams') ? `<button class="btn btn-ghost btn-sm" onclick="openWorkstreamModal('${w.id}')">Edit</button>` : ''}
+          ${currentUser?.role==='admin'   ? `<button class="btn btn-danger btn-sm" onclick="deleteWorkstream('${w.id}')">Delete</button>` : ''}
         </div>
       </div>
       <div style="font-size:13px;color:var(--text2);">${w.desc}</div>
@@ -1633,6 +1711,7 @@ function renderWorkstreams() {
 }
 
 function openWorkstreamModal(id) {
+  if (!can('interact','workstreams')) { toast('You do not have permission to manage workstreams.', 'error'); return; }
   editingWsId = id || null;
   if (id) {
     const ws = DB.workstreams.find(w=>w.id===id);
@@ -1685,10 +1764,11 @@ function settingsTab(tab, el) {
   el.classList.add('active');
   if (tab==='users') renderUsers();
   if (tab==='permissions') renderPermissions();
+  if (tab==='dashboard') renderDashboardSegments();
 }
 
 function renderSettings() {
-  renderTypeList(); renderPriorityList(); renderLabelList(); renderStatusList(); renderUsers(); renderPermissions();
+  renderTypeList(); renderPriorityList(); renderLabelList(); renderStatusList(); renderUsers(); renderPermissions(); renderDashboardSegments();
 }
 
 function renderTypeList() {
@@ -1871,16 +1951,25 @@ function resetPermissions() {
 
 // Hide nav items for pages the current user cannot view
 function applyRoleVisibility() {
-  const navMap = { dashboard:0, issues:1, kanban:2, gantt:3, workstreams:4, settings:5 };
   const items = document.querySelectorAll('.sidebar .nav-item');
-  Object.entries(navMap).forEach(([page, idx]) => {
+  // Order in DOM matches: dashboard, issues, kanban, gantt, focus, workstreams, settings
+  const order = ['dashboard','issues','kanban','gantt','focus','workstreams','settings'];
+  order.forEach((page, idx) => {
     const item = items[idx];
     if (!item) return;
     item.style.display = can('view', page) ? '' : 'none';
   });
-  // Hide "+ New Issue" if no interact on issues
   const newBtn = document.querySelector('.topbar .btn-primary');
   if (newBtn) newBtn.style.display = can('interact','issues') ? '' : 'none';
+  // Import is admin-only
+  const importBtn = document.getElementById('importBtn');
+  if (importBtn) importBtn.style.display = currentUser?.role === 'admin' ? '' : 'none';
+  // Workstreams: only show "+ New Workstream" if can interact
+  const wsNewBtn = document.querySelector('#page-workstreams .btn-primary');
+  if (wsNewBtn) wsNewBtn.style.display = can('interact','workstreams') ? '' : 'none';
+  // Users: only admin can add users
+  const addUserBtn = document.getElementById('addUserBtn');
+  if (addUserBtn) addUserBtn.style.display = currentUser?.role === 'admin' ? '' : 'none';
 }
 
 // ====== EXCEL IMPORT/EXPORT ======
@@ -1955,6 +2044,89 @@ function toast(msg, type='info') {
 // Keyboard shortcut
 document.addEventListener('keydown', e => { if (e.key==='Escape') document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(m=>m.classList.add('hidden')); });
 document.addEventListener('keydown', e => { if (e.key==='n' && e.ctrlKey) { e.preventDefault(); openNewIssue(); } });
+
+// Enter-key submits login form
+document.addEventListener('DOMContentLoaded', () => {
+  ['loginUser','loginPass'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); doLogin(); }
+    });
+  });
+});
+
+// ====== FOCUS PAGE (my assigned items) ======
+function renderFocus() {
+  const tbody = document.getElementById('focusTbody');
+  if (!tbody || !currentUser) return;
+  // Reuse the issue filters but always restrict to current user as assignee
+  const all = getFilteredIssues('focus').filter(i => (i.assignee||'') === currentUser.name);
+  if (!all.length) { tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text3);">No items assigned to you.</td></tr>`; updateFocusCount(); return; }
+  tbody.innerHTML = all.map(i => {
+    const canEdit = canEditIssue(i);
+    const canDelete = currentUser?.role === 'admin';
+    const labels = (i.labels||[]).map(l => { const lb = DB.labels.find(x => (x.name||x) === l); const c = (lb?.color)||'#6c63ff'; return `<span class="badge" style="background:${c}22;color:${c};margin:1px;">${escapeHtml(l)}</span>`; }).join('');
+    return `<tr ${canEdit ? `onclick="openEditIssue('${i.id}')"` : ''}>
+      <td><span class="mono text-sm text-muted">#${escapeHtml(String(i.id).slice(0,6))}</span></td>
+      <td><b>${escapeHtml(i.title)}</b></td>
+      <td><span class="badge badge-${(i.type||'').toLowerCase()}">${escapeHtml(i.type||'')}</span></td>
+      <td><span class="badge badge-${(i.status||'').toLowerCase().replace(/\s+/g,'')}">${escapeHtml(i.status||'')}</span></td>
+      <td><span class="prio-dot prio-${(i.priority||'').toLowerCase()}"></span> ${escapeHtml(i.priority||'')}</td>
+      <td>${escapeHtml(i.workstream||'')}</td>
+      <td class="mono text-sm">${escapeHtml(i.start||'')}</td>
+      <td class="mono text-sm">${escapeHtml(i.end||'')}</td>
+      <td>${labels}</td>
+      <td onclick="event.stopPropagation()">
+        ${canEdit ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="openEditIssue('${i.id}')" title="Edit">✏️</button>` : ''}
+        ${canDelete ? `<button class="btn btn-danger btn-sm btn-icon" onclick="deleteIssue('${i.id}')" title="Delete">🗑</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+  updateFocusCount();
+}
+function updateFocusCount() {
+  const el = document.getElementById('focusCount');
+  if (!el || !currentUser) { if (el) el.textContent='0'; return; }
+  const n = DB.issues.filter(i => (i.assignee||'') === currentUser.name && i.status !== 'Done').length;
+  el.textContent = n;
+}
+
+// ====== DASHBOARD SEGMENTS (admin-editable status mapping) ======
+function renderDashboardSegments() {
+  const host = document.getElementById('segEditor');
+  if (!host) return;
+  const seg = DB.dashboardSegments || { in_progress:[], completed:[], need_attention:[] };
+  const isAdmin = currentUser?.role === 'admin';
+  const saveBtn = document.getElementById('saveSegBtn');
+  if (saveBtn) saveBtn.style.display = isAdmin ? '' : 'none';
+  const buckets = [
+    { key: 'in_progress',    label: 'In Progress' },
+    { key: 'completed',      label: 'Completed' },
+    { key: 'need_attention', label: 'Need Attention' },
+  ];
+  host.innerHTML = buckets.map(b => `
+    <div class="seg-card">
+      <h4>${escapeHtml(b.label)}</h4>
+      <div class="seg-opts">
+        ${DB.statuses.map(s => {
+          const checked = (seg[b.key]||[]).includes(s.name) ? 'checked' : '';
+          return `<label><input type="checkbox" data-bucket="${b.key}" data-status="${escapeAttr(s.name)}" ${checked} ${isAdmin?'':'disabled'}> ${escapeHtml(s.name)}</label>`;
+        }).join('')}
+      </div>
+    </div>`).join('');
+}
+function saveDashboardSegments() {
+  if (currentUser?.role !== 'admin') { toast('Only admins can edit segments.', 'error'); return; }
+  const seg = { in_progress:[], completed:[], need_attention:[] };
+  document.querySelectorAll('#segEditor input[type=checkbox]').forEach(cb => {
+    if (cb.checked) seg[cb.dataset.bucket].push(cb.dataset.status);
+  });
+  DB.dashboardSegments = seg;
+  Cloud.saveSetting('dashboard_segments', seg);
+  renderDashboard();
+  toast('Dashboard segments saved', 'success');
+}
 
 // ====== THEME ======
 function toggleTheme() {
