@@ -6,6 +6,15 @@
 <title>FlowDesk — Project Management Suite</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script type="module">
+  // Expose a Supabase client globally so the legacy inline script can use it.
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+  const SUPABASE_URL = 'https://rldmpekyygxhprwgifnn.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJsZG1wZWt5eWd4aHByd2dpZm5uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNTI2MDMsImV4cCI6MjA5MjcyODYwM30.McMxrOQzRhMqcPH461lF8jq8_OpsPXp3z4YP57YKTVU';
+  window.sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+  window.sbReady = true;
+  window.dispatchEvent(new Event('sb-ready'));
+</script>
 <style>
 :root {
   --bg: #0f0f13;
@@ -356,7 +365,7 @@ textarea { resize: vertical; min-height: 80px; }
       <input type="password" id="loginPass" placeholder="Enter password">
     </div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px;" onclick="doLogin()">Sign In</button>
-    <div style="margin-top:16px;font-size:12px;color:var(--text3);text-align:center;">Default: admin / admin123</div>
+    <div style="margin-top:16px;font-size:12px;color:var(--text3);text-align:center;">Sign in with your FlowDesk account.</div>
   </div>
 </div>
 
@@ -742,21 +751,208 @@ textarea { resize: vertical; min-height: 80px; }
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
+// ===================== CLOUD SYNC LAYER =====================
+// Wraps Supabase reads/writes so the rest of the app keeps using the
+// in-memory `DB` object. All mutations should go through Cloud.* helpers
+// so changes persist + propagate to other users via realtime.
+const Cloud = {
+  ready: false,
+  channels: [],
+  async waitForClient() {
+    if (window.sb) return window.sb;
+    return new Promise(res => {
+      window.addEventListener('sb-ready', () => res(window.sb), { once: true });
+    });
+  },
+  async loadAll() {
+    const sb = await this.waitForClient();
+    const [u, w, i, a, s] = await Promise.all([
+      sb.from('app_users').select('*').order('created_at'),
+      sb.from('workstreams').select('*').order('created_at'),
+      sb.from('issues').select('*').order('created_at'),
+      sb.from('activities').select('*').order('created_at', { ascending: false }).limit(200),
+      sb.from('settings_kv').select('*'),
+    ]);
+    if (u.data) DB.users = u.data.map(this.mapUserFromDB);
+    if (w.data) DB.workstreams = w.data.map(this.mapWsFromDB);
+    if (i.data) DB.issues = i.data.map(this.mapIssueFromDB);
+    if (a.data) DB.activity = a.data.map(this.mapActivityFromDB).reverse();
+    if (s.data) this.applySettings(s.data);
+    this.ready = true;
+  },
+  applySettings(rows) {
+    const map = Object.fromEntries(rows.map(r => [r.key, r.value]));
+    if (Array.isArray(map.labels))     DB.labels     = map.labels.map((n,idx) => typeof n==='string' ? { name:n, color: ['#6c63ff','#14b8a6','#f59e0b','#ef4444','#22c55e','#3b82f6','#ec4899'][idx%7] } : n);
+    if (Array.isArray(map.statuses))   DB.statuses   = map.statuses.map((n,idx) => typeof n==='string' ? { name:n, color: ['#9090a8','#3b82f6','#f59e0b','#22c55e','#ef4444'][idx%5] } : n);
+    if (Array.isArray(map.types))      DB.types      = map.types.map((n,idx) => typeof n==='string' ? { name:n, color: ['#ef4444','#6c63ff','#14b8a6','#ec4899','#f97316'][idx%5] } : n);
+    if (Array.isArray(map.priorities)) DB.priorities = map.priorities.slice();
+    if (map.roles_perm)                DB.permissions = this.mapPermissionsFromDB(map.roles_perm);
+    if (map.dashboard_segments)        DB.dashboardSegments = map.dashboard_segments;
+  },
+  mapUserFromDB(r) {
+    return { id: r.id, name: r.name, username: r.username, password: r.password, email: r.email||'', role: r.role, dept: r.dept||'', responsibilities: r.responsibilities||'', avatarColor: r.avatar_color };
+  },
+  mapWsFromDB(r) { return { id: r.id, name: r.name, dept: r.dept||'', desc: r.description||'', color: r.color||'#6c63ff' }; },
+  mapIssueFromDB(r) {
+    return { id: r.id, title: r.title, type: r.type, status: r.status, priority: r.priority,
+      assignee: r.assignee||'', workstream: r.workstream||'', labels: r.labels||[],
+      start: r.start_date||'', end: r.end_date||'', desc: r.description||'',
+      checklist: r.checklist||[], createdBy: r.created_by, createdByName: r.created_by_name, created: r.created_at };
+  },
+  mapActivityFromDB(r) {
+    const d = new Date(r.created_at);
+    return { text: r.action, userId: r.user_id, userName: r.user_name||'System',
+      time: d.toLocaleTimeString() + ' ' + d.toLocaleDateString() };
+  },
+  mapPermissionsFromDB(rp) {
+    // rp shape: { role: { view:[pages], interact:[pages] } } -> internal { role: { page: { view, interact } } }
+    const out = {};
+    for (const role of Object.keys(rp)) {
+      out[role] = {};
+      for (const page of PERM_PAGES) {
+        out[role][page] = {
+          view: (rp[role].view||[]).includes(page),
+          interact: (rp[role].interact||[]).includes(page),
+        };
+      }
+    }
+    return out;
+  },
+  permissionsToDB() {
+    const out = {};
+    for (const role of PERM_ROLES) {
+      out[role] = { view: [], interact: [] };
+      for (const page of PERM_PAGES) {
+        if (DB.permissions[role]?.[page]?.view)     out[role].view.push(page);
+        if (DB.permissions[role]?.[page]?.interact) out[role].interact.push(page);
+      }
+    }
+    return out;
+  },
+  // ----- Issues -----
+  async upsertIssue(issue) {
+    const sb = await this.waitForClient();
+    const row = {
+      id: issue.id, title: issue.title, type: issue.type, status: issue.status,
+      priority: issue.priority, assignee: issue.assignee||null, workstream: issue.workstream||null,
+      labels: issue.labels||[], checklist: issue.checklist||[],
+      start_date: issue.start||null, end_date: issue.end||null,
+      description: issue.desc||'', created_by: issue.createdBy||null,
+      created_by_name: issue.createdByName||null,
+    };
+    const { data, error } = await sb.from('issues').upsert(row).select().single();
+    if (error) { console.error('upsertIssue', error); toast('Save failed: ' + error.message,'error'); return null; }
+    return Cloud.mapIssueFromDB(data);
+  },
+  async deleteIssue(id) {
+    const sb = await this.waitForClient();
+    const { error } = await sb.from('issues').delete().eq('id', id);
+    if (error) { console.error('deleteIssue', error); toast('Delete failed','error'); }
+  },
+  // ----- Workstreams -----
+  async upsertWorkstream(ws) {
+    const sb = await this.waitForClient();
+    const row = { id: ws.id, name: ws.name, dept: ws.dept||null, description: ws.desc||null, color: ws.color||null };
+    const { data, error } = await sb.from('workstreams').upsert(row).select().single();
+    if (error) { console.error('upsertWorkstream', error); toast('Save failed','error'); return null; }
+    return Cloud.mapWsFromDB(data);
+  },
+  async deleteWorkstream(id) {
+    const sb = await this.waitForClient();
+    const { error } = await sb.from('workstreams').delete().eq('id', id);
+    if (error) { console.error('deleteWorkstream', error); toast('Delete failed','error'); }
+  },
+  // ----- Users -----
+  async upsertUser(u) {
+    const sb = await this.waitForClient();
+    const row = { id: u.id, name: u.name, username: u.username, email: u.email||null,
+      role: u.role, dept: u.dept||null };
+    if (u.password) row.password = u.password;
+    const { data, error } = await sb.from('app_users').upsert(row).select().single();
+    if (error) { console.error('upsertUser', error); toast('Save failed: ' + error.message,'error'); return null; }
+    return Cloud.mapUserFromDB(data);
+  },
+  async deleteUser(id) {
+    const sb = await this.waitForClient();
+    const { error } = await sb.from('app_users').delete().eq('id', id);
+    if (error) { console.error('deleteUser', error); toast('Delete failed','error'); }
+  },
+  // ----- Activity -----
+  async logActivity(text) {
+    const sb = await this.waitForClient();
+    const row = {
+      action: text,
+      user_id: currentUser?.id || null,
+      user_name: currentUser?.name || 'System',
+    };
+    const { error } = await sb.from('activities').insert(row);
+    if (error) console.error('logActivity', error);
+  },
+  // ----- Settings -----
+  async saveSetting(key, value) {
+    const sb = await this.waitForClient();
+    const { error } = await sb.from('settings_kv').upsert({ key, value });
+    if (error) { console.error('saveSetting', error); toast('Save failed','error'); }
+  },
+  // ----- Realtime -----
+  subscribe(onChange) {
+    if (!window.sb) return;
+    this.unsubscribe();
+    const ch = window.sb.channel('flowdesk-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'issues' },      () => onChange('issues'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workstreams' }, () => onChange('workstreams'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_users' },   () => onChange('users'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' },  () => onChange('activities'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings_kv' }, () => onChange('settings'))
+      .subscribe();
+    this.channels.push(ch);
+  },
+  unsubscribe() {
+    this.channels.forEach(ch => { try { window.sb.removeChannel(ch); } catch(_){} });
+    this.channels = [];
+  },
+};
+
+// Refresh just the slice that changed, then re-render the active page
+async function cloudHandleChange(kind) {
+  const sb = await Cloud.waitForClient();
+  if (kind === 'issues') {
+    const { data } = await sb.from('issues').select('*').order('created_at');
+    if (data) DB.issues = data.map(Cloud.mapIssueFromDB);
+    updateOpenCount();
+  } else if (kind === 'workstreams') {
+    const { data } = await sb.from('workstreams').select('*').order('created_at');
+    if (data) DB.workstreams = data.map(Cloud.mapWsFromDB);
+  } else if (kind === 'users') {
+    const { data } = await sb.from('app_users').select('*').order('created_at');
+    if (data) DB.users = data.map(Cloud.mapUserFromDB);
+  } else if (kind === 'activities') {
+    const { data } = await sb.from('activities').select('*').order('created_at',{ascending:false}).limit(200);
+    if (data) DB.activity = data.map(Cloud.mapActivityFromDB).reverse();
+  } else if (kind === 'settings') {
+    const { data } = await sb.from('settings_kv').select('*');
+    if (data) Cloud.applySettings(data);
+  }
+  rerenderActivePage();
+}
+
+function rerenderActivePage() {
+  const active = document.querySelector('.page.active');
+  if (!active) return;
+  const id = active.id; // page-xxx
+  if (id === 'page-dashboard')    renderDashboard();
+  else if (id === 'page-issues')      renderIssues();
+  else if (id === 'page-kanban')      renderKanban();
+  else if (id === 'page-gantt')       renderGantt();
+  else if (id === 'page-workstreams') renderWorkstreams();
+  else if (id === 'page-settings')    renderSettings();
+}
+
 // ===================== DATA STORE =====================
 let DB = {
   issues: [],
-  users: [
-    { id: 1, name: 'Alice Admin', username: 'admin', password: 'admin123', email: 'alice@company.com', role: 'admin', dept: 'Management', responsibilities: 'Full system access, user management' },
-    { id: 2, name: 'Bob PM', username: 'bob', password: 'bob123', email: 'bob@company.com', role: 'pm', dept: 'Product', responsibilities: 'Sprint planning, backlog grooming' },
-    { id: 3, name: 'Carol Dev', username: 'carol', password: 'carol123', email: 'carol@company.com', role: 'dev', dept: 'Engineering', responsibilities: 'Frontend development, code reviews' },
-    { id: 4, name: 'Dave Dev', username: 'dave', password: 'dave123', email: 'dave@company.com', role: 'dev', dept: 'Engineering', responsibilities: 'Backend development, DevOps' },
-  ],
-  workstreams: [
-    { id: 1, name: 'Frontend', dept: 'Engineering', desc: 'UI/UX development and web components', color: '#6c63ff' },
-    { id: 2, name: 'Backend API', dept: 'Engineering', desc: 'Server, database and API development', color: '#14b8a6' },
-    { id: 3, name: 'Product Design', dept: 'Product', desc: 'User research, wireframes, prototypes', color: '#ec4899' },
-    { id: 4, name: 'DevOps', dept: 'Infrastructure', desc: 'CI/CD, deployments, monitoring', color: '#f59e0b' },
-  ],
+  users: [],
+  workstreams: [],
   labels: [
     { name: 'UI', color: '#6c63ff' },
     { name: 'API', color: '#14b8a6' },
@@ -781,12 +977,10 @@ let DB = {
   ],
   priorities: ['Critical', 'High', 'Medium', 'Low'],
   activity: [],
-  nextIssueId: 1,
-  nextUserId: 5,
-  nextWsId: 5,
   // Per-role tab permissions: view + interact (edit/create/drag)
   // Pages: dashboard, issues, kanban, gantt, workstreams, settings
   permissions: null, // populated by initPermissions()
+  dashboardSegments: { in_progress:['In Progress','In Review'], completed:['Done'], need_attention:['Blocked'] },
 };
 
 let currentUser = null;
@@ -827,64 +1021,45 @@ function canEditIssue(issue) {
   return issue && issue.createdBy === currentUser.id;
 }
 
-// ====== SEED SAMPLE ISSUES ======
-function seedIssues() {
-  if (appSeeded || DB.issues.length) return; // fix: never seed twice
-  appSeeded = true;
-  const titles = [
-    'Fix login page redirect on mobile', 'Implement OAuth2 integration', 'Database query optimization',
-    'Design onboarding flow', 'API rate limiting middleware', 'Fix CSV export encoding',
-    'Add dark mode toggle', 'User profile page redesign', 'Kubernetes deployment config',
-    'Password reset email template', 'Implement search indexing', 'Fix sidebar z-index bug'
-  ];
-  const today = new Date();
-  titles.forEach((title, i) => {
-    const start = new Date(today); start.setDate(start.getDate() - Math.floor(Math.random()*20));
-    const end = new Date(start); end.setDate(end.getDate() + 5 + Math.floor(Math.random()*20));
-    DB.issues.push({
-      id: DB.nextIssueId++,
-      title,
-      type: DB.types[i % DB.types.length].name,
-      status: DB.statuses[i % DB.statuses.length].name,
-      priority: DB.priorities[i % DB.priorities.length],
-      assignee: DB.users[i % DB.users.length].name,
-      workstream: DB.workstreams[i % DB.workstreams.length].name,
-      labels: [DB.labels[i % DB.labels.length].name],
-      start: fmtDate(start), end: fmtDate(end),
-      desc: 'Sample issue description for testing purposes.',
-      checklist: [
-        { text: 'Review requirements', done: i % 3 === 0 },
-        { text: 'Implementation', done: false },
-        { text: 'Write tests', done: false }
-      ],
-      createdBy: DB.users[i % DB.users.length].id,
-      createdByName: DB.users[i % DB.users.length].name,
-      created: new Date().toISOString()
-    });
-  });
-}
+// Sample issues are no longer client-seeded; data lives in the cloud DB.
+function seedIssues() { /* no-op: data comes from Cloud.loadAll() */ }
 
 function fmtDate(d) {
   return d.toISOString().split('T')[0];
 }
 
 // ====== AUTH ======
-function doLogin() {
+async function doLogin() {
   const u = document.getElementById('loginUser').value.trim();
   const p = document.getElementById('loginPass').value.trim();
-  const user = DB.users.find(x => x.username === u && x.password === p);
-  if (!user) { document.getElementById('loginError').style.display = 'block'; return; }
-  currentUser = user;
+  if (!u || !p) { document.getElementById('loginError').textContent = 'Enter username and password.'; document.getElementById('loginError').style.display='block'; return; }
+  try {
+    const sb = await Cloud.waitForClient();
+    const { data, error } = await sb.from('app_users').select('*').eq('username', u).maybeSingle();
+    if (error) throw error;
+    if (!data || data.password !== p) {
+      document.getElementById('loginError').textContent = 'Invalid username or password.';
+      document.getElementById('loginError').style.display = 'block';
+      return;
+    }
+    currentUser = Cloud.mapUserFromDB(data);
+  } catch (err) {
+    console.error('login', err);
+    document.getElementById('loginError').textContent = 'Login failed: ' + (err.message||'unknown error');
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('app').style.display = 'flex';
   document.body.classList.remove('login-mode');
-  document.getElementById('sidebarUsername').textContent = user.name;
-  document.getElementById('sidebarRole').textContent = user.role.toUpperCase();
-  document.getElementById('sidebarAvatar').textContent = user.name[0];
-  initApp();
+  document.getElementById('sidebarUsername').textContent = currentUser.name;
+  document.getElementById('sidebarRole').textContent = (currentUser.role||'').toUpperCase();
+  document.getElementById('sidebarAvatar').textContent = currentUser.name[0];
+  await initApp();
 }
 function doLogout() {
+  Cloud.unsubscribe();
   currentUser = null;
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
@@ -917,14 +1092,16 @@ function nav(page, el) {
 }
 
 // ====== INIT ======
-function initApp() {
-  initPermissions();
-  seedIssues();
+async function initApp() {
+  try { await Cloud.loadAll(); }
+  catch (e) { console.error('Cloud.loadAll failed', e); toast('Failed to load workspace data','error'); }
+  initPermissions(); // ensures DB.permissions exists even if settings row missing
   buildFilterUI();
   populateFilters();
   applyRoleVisibility();
   renderDashboard();
   updateOpenCount();
+  Cloud.subscribe(cloudHandleChange);
 }
 
 function updateOpenCount() {
@@ -997,12 +1174,15 @@ function renderActivity() {
 }
 
 function logActivity(text) {
+  // Optimistic local push so the UI updates immediately
   DB.activity.push({
     text,
     userId: currentUser?.id || null,
     userName: currentUser?.name || 'System',
     time: new Date().toLocaleTimeString() + ' ' + new Date().toLocaleDateString()
   });
+  // Persist (fire-and-forget; realtime will sync other tabs)
+  Cloud.logActivity(text).catch(()=>{});
 }
 
 // ====== ISSUES ======
@@ -1135,7 +1315,7 @@ function renderIssues() {
     const canEdit = canEditIssue(i);
     const canDelete = currentUser?.role === 'admin';
     const labels = (i.labels||[]).map(l => { const lb = DB.labels.find(x=>x.name===l); return `<span class="badge" style="background:${(lb?.color||'#6c63ff')}22;color:${lb?.color||'#6c63ff'};margin:1px;">${l}</span>`; }).join('');
-    return `<tr onclick="${canEdit ? `openEditIssue(${i.id})` : ''}">
+    return `<tr onclick="${canEdit ? `openEditIssue('${i.id}')` : ''}">
       <td class="mono" style="color:var(--text3);font-size:11px;">#${i.id}</td>
       <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;">${i.title}</td>
       <td><span class="badge badge-${i.type.toLowerCase()}">${i.type}</span></td>
@@ -1148,8 +1328,8 @@ function renderIssues() {
       <td>${labels||'—'}</td>
       <td onclick="event.stopPropagation()">
         <div style="display:flex;gap:4px;">
-          ${canEdit ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="openEditIssue(${i.id})" title="Edit">✏️</button>` : ''}
-          ${canDelete ? `<button class="btn btn-danger btn-sm btn-icon" onclick="deleteIssue(${i.id})" title="Delete">🗑</button>` : ''}
+          ${canEdit ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="openEditIssue('${i.id}')" title="Edit">✏️</button>` : ''}
+          ${canDelete ? `<button class="btn btn-danger btn-sm btn-icon" onclick="deleteIssue('${i.id}')" title="Delete">🗑</button>` : ''}
         </div>
       </td>
     </tr>`;
@@ -1272,13 +1452,15 @@ function saveIssue() {
   };
   if (editingIssueId) {
     const idx = DB.issues.findIndex(i => i.id === editingIssueId);
-    DB.issues[idx] = { ...DB.issues[idx], ...data };
-    logActivity(`Updated issue #${editingIssueId}: ${title}`);
+    const merged = { ...DB.issues[idx], ...data };
+    DB.issues[idx] = merged;
+    Cloud.upsertIssue(merged).then(saved => { if (saved) { const i = DB.issues.findIndex(x=>x.id===saved.id); if (i>=0) DB.issues[i] = saved; rerenderActivePage(); }});
+    logActivity(`Updated issue: ${title}`);
     toast('Issue updated successfully', 'success');
   } else {
-    const issue = { id: DB.nextIssueId++, ...data, createdBy: currentUser?.id || null, createdByName: currentUser?.name || 'System' };
-    DB.issues.push(issue);
-    logActivity(`Created issue #${issue.id}: ${title}`);
+    const issue = { ...data, createdBy: currentUser?.id || null, createdByName: currentUser?.name || 'System' };
+    Cloud.upsertIssue(issue).then(saved => { if (saved) { DB.issues.push(saved); rerenderActivePage(); updateOpenCount(); }});
+    logActivity(`Created issue: ${title}`);
     toast('Issue created successfully', 'success');
   }
   closeModal('issueModal');
@@ -1288,8 +1470,10 @@ function saveIssue() {
 
 function deleteIssue(id) {
   if (!confirm('Delete this issue?')) return;
+  const removed = DB.issues.find(i => i.id === id);
   DB.issues = DB.issues.filter(i => i.id !== id);
-  logActivity(`Deleted issue #${id}`);
+  Cloud.deleteIssue(id);
+  logActivity(`Deleted issue: ${removed?.title||id}`);
   toast('Issue deleted', 'info');
   updateOpenCount();
   renderIssues();
@@ -1321,7 +1505,7 @@ function renderKanban() {
 function kanbanCard(i, canDrag) {
   const prioColors = { Critical:'var(--critical)', High:'var(--high)', Medium:'var(--medium)', Low:'var(--low)' };
   const editable = canEditIssue(i);
-  return `<div class="kanban-card" ${canDrag?'draggable="true"':''} ${canDrag?`ondragstart="dragStart(event,${i.id})" ondragend="dragEnd(event)"`:''} ${editable?`onclick="openEditIssue(${i.id})"`:''} style="${!canDrag?'cursor:default;':''}">
+  return `<div class="kanban-card" ${canDrag?'draggable="true"':''} ${canDrag?`ondragstart="dragStart(event,'${i.id}')" ondragend="dragEnd(event)"`:''} ${editable?`onclick="openEditIssue('${i.id}')"`:''} style="${!canDrag?'cursor:default;':''}">
     <div class="kanban-card-title">${i.title}</div>
     <div class="kanban-card-meta">
       <span class="badge badge-${i.type.toLowerCase()}" style="font-size:10px;">${i.type}</span>
@@ -1346,7 +1530,13 @@ function dropCard(event, status) {
   if (!can('interact','kanban')) { dragIssueId=null; toast('You do not have permission to move cards.', 'error'); return; }
   if (!dragIssueId) return;
   const issue = DB.issues.find(i => i.id === dragIssueId);
-  if (issue) { issue.status = status; logActivity(`Moved #${issue.id} to ${status}`); updateOpenCount(); renderKanban(); toast(`Moved to ${status}`, 'info'); }
+  if (issue) {
+    issue.status = status;
+    Cloud.upsertIssue(issue);
+    logActivity(`Moved "${issue.title}" to ${status}`);
+    updateOpenCount(); renderKanban();
+    toast(`Moved to ${status}`, 'info');
+  }
   dragIssueId = null;
 }
 
@@ -1424,8 +1614,8 @@ function renderWorkstreams() {
           <div style="font-size:12px;color:var(--text3);margin-top:2px;font-family:var(--mono);">${w.dept}</div>
         </div>
         <div style="display:flex;gap:6px;">
-          ${currentUser?.role==='admin' ? `<button class="btn btn-ghost btn-sm" onclick="openWorkstreamModal(${w.id})">Edit</button>` : ''}
-          ${currentUser?.role==='admin' ? `<button class="btn btn-danger btn-sm" onclick="deleteWorkstream(${w.id})">Delete</button>` : ''}
+          ${currentUser?.role==='admin' ? `<button class="btn btn-ghost btn-sm" onclick="openWorkstreamModal('${w.id}')">Edit</button>` : ''}
+          ${currentUser?.role==='admin' ? `<button class="btn btn-danger btn-sm" onclick="deleteWorkstream('${w.id}')">Delete</button>` : ''}
         </div>
       </div>
       <div style="font-size:13px;color:var(--text2);">${w.desc}</div>
@@ -1467,14 +1657,23 @@ function saveWorkstream() {
   const name = document.getElementById('wsName').value.trim();
   if (!name) { toast('Workstream name required','error'); return; }
   const data = { name, dept: document.getElementById('wsDept').value, desc: document.getElementById('wsDesc').value, color: document.getElementById('wsColor').value };
-  if (editingWsId) { const idx = DB.workstreams.findIndex(w=>w.id===editingWsId); DB.workstreams[idx]={...DB.workstreams[idx],...data}; toast('Workstream updated','success'); }
-  else { DB.workstreams.push({id:DB.nextWsId++,...data}); toast('Workstream created','success'); }
+  if (editingWsId) {
+    const idx = DB.workstreams.findIndex(w=>w.id===editingWsId);
+    const merged = { ...DB.workstreams[idx], ...data };
+    DB.workstreams[idx] = merged;
+    Cloud.upsertWorkstream(merged).then(saved => { if (saved) { const i = DB.workstreams.findIndex(x=>x.id===saved.id); if (i>=0) DB.workstreams[i]=saved; renderWorkstreams(); populateFilters(); }});
+    toast('Workstream updated','success');
+  } else {
+    Cloud.upsertWorkstream(data).then(saved => { if (saved) { DB.workstreams.push(saved); renderWorkstreams(); populateFilters(); }});
+    toast('Workstream created','success');
+  }
   closeModal('workstreamModal'); renderWorkstreams(); populateFilters();
 }
 
 function deleteWorkstream(id) {
   if (!confirm('Delete this workstream?')) return;
   DB.workstreams = DB.workstreams.filter(w=>w.id!==id);
+  Cloud.deleteWorkstream(id);
   renderWorkstreams(); populateFilters(); toast('Workstream deleted','info');
 }
 
@@ -1548,8 +1747,8 @@ function renderUsers() {
     <td><span class="role-badge role-${u.role}">${u.role}</span></td>
     <td style="font-size:12px;color:var(--text2);">${u.dept||'—'}</td>
     <td><div style="display:flex;gap:4px;">
-      ${currentUser?.role==='admin' ? `<button class="btn btn-ghost btn-sm" onclick="openUserModal(${u.id})">Edit</button>` : ''}
-      ${currentUser?.role==='admin' && u.id!==currentUser.id ? `<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">Delete</button>` : ''}
+      ${currentUser?.role==='admin' ? `<button class="btn btn-ghost btn-sm" onclick="openUserModal('${u.id}')">Edit</button>` : ''}
+      ${currentUser?.role==='admin' && u.id!==currentUser.id ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">Delete</button>` : ''}
     </div></td>
   </tr>`).join('');
 }
@@ -1589,11 +1788,13 @@ function saveUser() {
   if (pw) data.password = pw;
   if (editingUserId) {
     const idx = DB.users.findIndex(u=>u.id===editingUserId);
-    DB.users[idx]={...DB.users[idx],...data};
+    const merged = { ...DB.users[idx], ...data };
+    DB.users[idx] = merged;
+    Cloud.upsertUser(merged).then(saved => { if (saved) { const i = DB.users.findIndex(x=>x.id===saved.id); if (i>=0) DB.users[i]=saved; renderUsers(); populateFilters(); }});
     toast('User updated','success');
   } else {
     if (!pw) { toast('Password required for new user','error'); return; }
-    DB.users.push({id:DB.nextUserId++,password:pw,...data});
+    Cloud.upsertUser({ password: pw, ...data }).then(saved => { if (saved) { DB.users.push(saved); renderUsers(); populateFilters(); }});
     toast('User created','success');
   }
   closeModal('userModal'); renderUsers(); populateFilters();
@@ -1602,6 +1803,7 @@ function saveUser() {
 function deleteUser(id) {
   if (!confirm('Delete this user?')) return;
   DB.users = DB.users.filter(u=>u.id!==id);
+  Cloud.deleteUser(id);
   renderUsers(); toast('User deleted','info');
 }
 
@@ -1652,7 +1854,7 @@ function updatePerm(role, page, action, val) {
 
 function savePermissions() {
   if (currentUser?.role !== 'admin') { toast('Only admins can change permissions.', 'error'); return; }
-  try { localStorage.setItem('flowdesk_permissions', JSON.stringify(DB.permissions)); } catch(_) {}
+  Cloud.saveSetting('roles_perm', Cloud.permissionsToDB());
   applyRoleVisibility();
   toast('Permissions saved', 'success');
 }
@@ -1661,7 +1863,7 @@ function resetPermissions() {
   if (currentUser?.role !== 'admin') return;
   if (!confirm('Reset all role permissions to defaults?')) return;
   DB.permissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
-  try { localStorage.setItem('flowdesk_permissions', JSON.stringify(DB.permissions)); } catch(_) {}
+  Cloud.saveSetting('roles_perm', Cloud.permissionsToDB());
   applyRoleVisibility();
   renderPermissions();
   toast('Permissions reset', 'info');
@@ -1708,9 +1910,9 @@ function importExcel(input) {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws);
       let imported = 0;
+      const promises = [];
       rows.forEach(row => {
         if (!row.Title) return;
-        const existing = row.ID ? DB.issues.find(i=>i.id===parseInt(row.ID)) : null;
         let checklist = [];
         if (row.Checklist) {
           try {
@@ -1722,13 +1924,15 @@ function importExcel(input) {
           title: row.Title, type: row.Type||'Task', status: row.Status||'To Do',
           priority: row.Priority||'Medium', assignee: row.Assignee||'',
           workstream: row.Workstream||'', labels: row.Labels?row.Labels.split(',').map(l=>l.trim()):[],
-          start: row.StartDate||'', end: row.EndDate||'', desc: row.Description||'', checklist, created: new Date().toISOString()
+          start: row.StartDate||'', end: row.EndDate||'', desc: row.Description||'', checklist,
+          createdBy: currentUser?.id||null, createdByName: currentUser?.name||'System'
         };
-        if (existing) { Object.assign(existing, issue); }
-        else { DB.issues.push({id:DB.nextIssueId++,...issue}); imported++; }
+        promises.push(Cloud.upsertIssue(issue).then(saved => { if (saved) { DB.issues.push(saved); imported++; }}));
       });
-      toast(`Imported ${imported} new issues`, 'success');
-      renderIssues(); updateOpenCount(); populateFilters();
+      Promise.allSettled(promises).then(() => {
+        toast(`Imported ${imported} issues`, 'success');
+        renderIssues(); updateOpenCount(); populateFilters();
+      });
     } catch(err) { toast('Import failed: ' + err.message, 'error'); }
     input.value='';
   };
