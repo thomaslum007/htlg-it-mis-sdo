@@ -751,6 +751,203 @@ textarea { resize: vertical; min-height: 80px; }
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
+// ===================== CLOUD SYNC LAYER =====================
+// Wraps Supabase reads/writes so the rest of the app keeps using the
+// in-memory `DB` object. All mutations should go through Cloud.* helpers
+// so changes persist + propagate to other users via realtime.
+const Cloud = {
+  ready: false,
+  channels: [],
+  async waitForClient() {
+    if (window.sb) return window.sb;
+    return new Promise(res => {
+      window.addEventListener('sb-ready', () => res(window.sb), { once: true });
+    });
+  },
+  async loadAll() {
+    const sb = await this.waitForClient();
+    const [u, w, i, a, s] = await Promise.all([
+      sb.from('app_users').select('*').order('created_at'),
+      sb.from('workstreams').select('*').order('created_at'),
+      sb.from('issues').select('*').order('created_at'),
+      sb.from('activities').select('*').order('created_at', { ascending: false }).limit(200),
+      sb.from('settings_kv').select('*'),
+    ]);
+    if (u.data) DB.users = u.data.map(this.mapUserFromDB);
+    if (w.data) DB.workstreams = w.data.map(this.mapWsFromDB);
+    if (i.data) DB.issues = i.data.map(this.mapIssueFromDB);
+    if (a.data) DB.activity = a.data.map(this.mapActivityFromDB).reverse();
+    if (s.data) this.applySettings(s.data);
+    this.ready = true;
+  },
+  applySettings(rows) {
+    const map = Object.fromEntries(rows.map(r => [r.key, r.value]));
+    if (Array.isArray(map.labels))     DB.labels     = map.labels.map((n,idx) => typeof n==='string' ? { name:n, color: ['#6c63ff','#14b8a6','#f59e0b','#ef4444','#22c55e','#3b82f6','#ec4899'][idx%7] } : n);
+    if (Array.isArray(map.statuses))   DB.statuses   = map.statuses.map((n,idx) => typeof n==='string' ? { name:n, color: ['#9090a8','#3b82f6','#f59e0b','#22c55e','#ef4444'][idx%5] } : n);
+    if (Array.isArray(map.types))      DB.types      = map.types.map((n,idx) => typeof n==='string' ? { name:n, color: ['#ef4444','#6c63ff','#14b8a6','#ec4899','#f97316'][idx%5] } : n);
+    if (Array.isArray(map.priorities)) DB.priorities = map.priorities.slice();
+    if (map.roles_perm)                DB.permissions = this.mapPermissionsFromDB(map.roles_perm);
+    if (map.dashboard_segments)        DB.dashboardSegments = map.dashboard_segments;
+  },
+  mapUserFromDB(r) {
+    return { id: r.id, name: r.name, username: r.username, password: r.password, email: r.email||'', role: r.role, dept: r.dept||'', responsibilities: r.responsibilities||'', avatarColor: r.avatar_color };
+  },
+  mapWsFromDB(r) { return { id: r.id, name: r.name, dept: r.dept||'', desc: r.description||'', color: r.color||'#6c63ff' }; },
+  mapIssueFromDB(r) {
+    return { id: r.id, title: r.title, type: r.type, status: r.status, priority: r.priority,
+      assignee: r.assignee||'', workstream: r.workstream||'', labels: r.labels||[],
+      start: r.start_date||'', end: r.end_date||'', desc: r.description||'',
+      checklist: r.checklist||[], createdBy: r.created_by, createdByName: r.created_by_name, created: r.created_at };
+  },
+  mapActivityFromDB(r) {
+    const d = new Date(r.created_at);
+    return { text: r.action, userId: r.user_id, userName: r.user_name||'System',
+      time: d.toLocaleTimeString() + ' ' + d.toLocaleDateString() };
+  },
+  mapPermissionsFromDB(rp) {
+    // rp shape: { role: { view:[pages], interact:[pages] } } -> internal { role: { page: { view, interact } } }
+    const out = {};
+    for (const role of Object.keys(rp)) {
+      out[role] = {};
+      for (const page of PERM_PAGES) {
+        out[role][page] = {
+          view: (rp[role].view||[]).includes(page),
+          interact: (rp[role].interact||[]).includes(page),
+        };
+      }
+    }
+    return out;
+  },
+  permissionsToDB() {
+    const out = {};
+    for (const role of PERM_ROLES) {
+      out[role] = { view: [], interact: [] };
+      for (const page of PERM_PAGES) {
+        if (DB.permissions[role]?.[page]?.view)     out[role].view.push(page);
+        if (DB.permissions[role]?.[page]?.interact) out[role].interact.push(page);
+      }
+    }
+    return out;
+  },
+  // ----- Issues -----
+  async upsertIssue(issue) {
+    const sb = await this.waitForClient();
+    const row = {
+      id: issue.id, title: issue.title, type: issue.type, status: issue.status,
+      priority: issue.priority, assignee: issue.assignee||null, workstream: issue.workstream||null,
+      labels: issue.labels||[], checklist: issue.checklist||[],
+      start_date: issue.start||null, end_date: issue.end||null,
+      description: issue.desc||'', created_by: issue.createdBy||null,
+      created_by_name: issue.createdByName||null,
+    };
+    const { data, error } = await sb.from('issues').upsert(row).select().single();
+    if (error) { console.error('upsertIssue', error); toast('Save failed: ' + error.message,'error'); return null; }
+    return Cloud.mapIssueFromDB(data);
+  },
+  async deleteIssue(id) {
+    const sb = await this.waitForClient();
+    const { error } = await sb.from('issues').delete().eq('id', id);
+    if (error) { console.error('deleteIssue', error); toast('Delete failed','error'); }
+  },
+  // ----- Workstreams -----
+  async upsertWorkstream(ws) {
+    const sb = await this.waitForClient();
+    const row = { id: ws.id, name: ws.name, dept: ws.dept||null, description: ws.desc||null, color: ws.color||null };
+    const { data, error } = await sb.from('workstreams').upsert(row).select().single();
+    if (error) { console.error('upsertWorkstream', error); toast('Save failed','error'); return null; }
+    return Cloud.mapWsFromDB(data);
+  },
+  async deleteWorkstream(id) {
+    const sb = await this.waitForClient();
+    const { error } = await sb.from('workstreams').delete().eq('id', id);
+    if (error) { console.error('deleteWorkstream', error); toast('Delete failed','error'); }
+  },
+  // ----- Users -----
+  async upsertUser(u) {
+    const sb = await this.waitForClient();
+    const row = { id: u.id, name: u.name, username: u.username, email: u.email||null,
+      role: u.role, dept: u.dept||null };
+    if (u.password) row.password = u.password;
+    const { data, error } = await sb.from('app_users').upsert(row).select().single();
+    if (error) { console.error('upsertUser', error); toast('Save failed: ' + error.message,'error'); return null; }
+    return Cloud.mapUserFromDB(data);
+  },
+  async deleteUser(id) {
+    const sb = await this.waitForClient();
+    const { error } = await sb.from('app_users').delete().eq('id', id);
+    if (error) { console.error('deleteUser', error); toast('Delete failed','error'); }
+  },
+  // ----- Activity -----
+  async logActivity(text) {
+    const sb = await this.waitForClient();
+    const row = {
+      action: text,
+      user_id: currentUser?.id || null,
+      user_name: currentUser?.name || 'System',
+    };
+    const { error } = await sb.from('activities').insert(row);
+    if (error) console.error('logActivity', error);
+  },
+  // ----- Settings -----
+  async saveSetting(key, value) {
+    const sb = await this.waitForClient();
+    const { error } = await sb.from('settings_kv').upsert({ key, value });
+    if (error) { console.error('saveSetting', error); toast('Save failed','error'); }
+  },
+  // ----- Realtime -----
+  subscribe(onChange) {
+    if (!window.sb) return;
+    this.unsubscribe();
+    const ch = window.sb.channel('flowdesk-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'issues' },      () => onChange('issues'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workstreams' }, () => onChange('workstreams'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_users' },   () => onChange('users'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' },  () => onChange('activities'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings_kv' }, () => onChange('settings'))
+      .subscribe();
+    this.channels.push(ch);
+  },
+  unsubscribe() {
+    this.channels.forEach(ch => { try { window.sb.removeChannel(ch); } catch(_){} });
+    this.channels = [];
+  },
+};
+
+// Refresh just the slice that changed, then re-render the active page
+async function cloudHandleChange(kind) {
+  const sb = await Cloud.waitForClient();
+  if (kind === 'issues') {
+    const { data } = await sb.from('issues').select('*').order('created_at');
+    if (data) DB.issues = data.map(Cloud.mapIssueFromDB);
+    updateOpenCount();
+  } else if (kind === 'workstreams') {
+    const { data } = await sb.from('workstreams').select('*').order('created_at');
+    if (data) DB.workstreams = data.map(Cloud.mapWsFromDB);
+  } else if (kind === 'users') {
+    const { data } = await sb.from('app_users').select('*').order('created_at');
+    if (data) DB.users = data.map(Cloud.mapUserFromDB);
+  } else if (kind === 'activities') {
+    const { data } = await sb.from('activities').select('*').order('created_at',{ascending:false}).limit(200);
+    if (data) DB.activity = data.map(Cloud.mapActivityFromDB).reverse();
+  } else if (kind === 'settings') {
+    const { data } = await sb.from('settings_kv').select('*');
+    if (data) Cloud.applySettings(data);
+  }
+  rerenderActivePage();
+}
+
+function rerenderActivePage() {
+  const active = document.querySelector('.page.active');
+  if (!active) return;
+  const id = active.id; // page-xxx
+  if (id === 'page-dashboard')    renderDashboard();
+  else if (id === 'page-issues')      renderIssues();
+  else if (id === 'page-kanban')      renderKanban();
+  else if (id === 'page-gantt')       renderGantt();
+  else if (id === 'page-workstreams') renderWorkstreams();
+  else if (id === 'page-settings')    renderSettings();
+}
+
 // ===================== DATA STORE =====================
 let DB = {
   issues: [],
