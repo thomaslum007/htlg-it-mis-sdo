@@ -556,6 +556,7 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
       <div class="tab" onclick="settingsTab('labels',this)">Labels</div>
       <div class="tab" onclick="settingsTab('statuses',this)">Statuses</div>
       <div class="tab" onclick="settingsTab('users',this)">Users</div>
+      <div class="tab" onclick="settingsTab('dashboard',this)">Dashboard</div>
       <div class="tab" onclick="settingsTab('permissions',this)">Roles &amp; Permissions</div>
     </div>
     <div id="settings-general" class="settings-content">
@@ -612,6 +613,19 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
       </div>
     </div>
     <div id="settings-permissions" class="settings-content hidden">
+      <!-- moved below dashboard -->
+    </div>
+    <div id="settings-dashboard" class="settings-content hidden">
+      <div class="settings-section">
+        <div class="settings-title">Dashboard Segments</div>
+        <div class="settings-desc">Choose which statuses count toward each Dashboard KPI. <b>Admin only.</b></div>
+        <div class="seg-editor" id="segEditor"></div>
+        <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;">
+          <button class="btn btn-primary btn-sm" id="saveSegBtn" onclick="saveDashboardSegments()">Save Segments</button>
+        </div>
+      </div>
+    </div>
+    <div id="settings-permissions-real" class="settings-content hidden">
       <div class="settings-section">
         <div class="settings-title">Roles &amp; Permissions</div>
         <div class="settings-desc">Control which tabs each role can <b>View</b> and <b>Interact</b> with. Only admins can change these settings. Viewers can never add users, edit kanban, or edit issues created by others.</div>
