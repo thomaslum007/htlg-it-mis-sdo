@@ -1174,12 +1174,15 @@ function renderActivity() {
 }
 
 function logActivity(text) {
+  // Optimistic local push so the UI updates immediately
   DB.activity.push({
     text,
     userId: currentUser?.id || null,
     userName: currentUser?.name || 'System',
     time: new Date().toLocaleTimeString() + ' ' + new Date().toLocaleDateString()
   });
+  // Persist (fire-and-forget; realtime will sync other tabs)
+  Cloud.logActivity(text).catch(()=>{});
 }
 
 // ====== ISSUES ======
@@ -1449,13 +1452,15 @@ function saveIssue() {
   };
   if (editingIssueId) {
     const idx = DB.issues.findIndex(i => i.id === editingIssueId);
-    DB.issues[idx] = { ...DB.issues[idx], ...data };
-    logActivity(`Updated issue #${editingIssueId}: ${title}`);
+    const merged = { ...DB.issues[idx], ...data };
+    DB.issues[idx] = merged;
+    Cloud.upsertIssue(merged).then(saved => { if (saved) { const i = DB.issues.findIndex(x=>x.id===saved.id); if (i>=0) DB.issues[i] = saved; rerenderActivePage(); }});
+    logActivity(`Updated issue: ${title}`);
     toast('Issue updated successfully', 'success');
   } else {
-    const issue = { id: DB.nextIssueId++, ...data, createdBy: currentUser?.id || null, createdByName: currentUser?.name || 'System' };
-    DB.issues.push(issue);
-    logActivity(`Created issue #${issue.id}: ${title}`);
+    const issue = { ...data, createdBy: currentUser?.id || null, createdByName: currentUser?.name || 'System' };
+    Cloud.upsertIssue(issue).then(saved => { if (saved) { DB.issues.push(saved); rerenderActivePage(); updateOpenCount(); }});
+    logActivity(`Created issue: ${title}`);
     toast('Issue created successfully', 'success');
   }
   closeModal('issueModal');
@@ -1465,8 +1470,10 @@ function saveIssue() {
 
 function deleteIssue(id) {
   if (!confirm('Delete this issue?')) return;
+  const removed = DB.issues.find(i => i.id === id);
   DB.issues = DB.issues.filter(i => i.id !== id);
-  logActivity(`Deleted issue #${id}`);
+  Cloud.deleteIssue(id);
+  logActivity(`Deleted issue: ${removed?.title||id}`);
   toast('Issue deleted', 'info');
   updateOpenCount();
   renderIssues();
@@ -1523,7 +1530,13 @@ function dropCard(event, status) {
   if (!can('interact','kanban')) { dragIssueId=null; toast('You do not have permission to move cards.', 'error'); return; }
   if (!dragIssueId) return;
   const issue = DB.issues.find(i => i.id === dragIssueId);
-  if (issue) { issue.status = status; logActivity(`Moved #${issue.id} to ${status}`); updateOpenCount(); renderKanban(); toast(`Moved to ${status}`, 'info'); }
+  if (issue) {
+    issue.status = status;
+    Cloud.upsertIssue(issue);
+    logActivity(`Moved "${issue.title}" to ${status}`);
+    updateOpenCount(); renderKanban();
+    toast(`Moved to ${status}`, 'info');
+  }
   dragIssueId = null;
 }
 
