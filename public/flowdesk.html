@@ -1137,14 +1137,30 @@ function nav(page, el) {
   const pg = document.getElementById('page-' + page);
   if (pg) { pg.classList.remove('hidden'); pg.classList.add('active'); }
   if (el) el.classList.add('active');
-  const titles = { dashboard:'Dashboard', issues:'Issues', kanban:'Kanban Board', gantt:'Gantt Chart', workstreams:'Workstreams', settings:'Settings' };
+  const titles = { dashboard:'Dashboard', issues:'Issues', kanban:'Kanban Board', gantt:'Gantt Chart', focus:'Focus', workstreams:'Workstreams', settings:'Settings' };
   document.getElementById('pageTitle').textContent = titles[page] || page;
   if (page === 'dashboard') renderDashboard();
   if (page === 'issues') renderIssues();
   if (page === 'kanban') renderKanban();
   if (page === 'gantt') renderGantt();
+  if (page === 'focus') renderFocus();
   if (page === 'workstreams') renderWorkstreams();
   if (page === 'settings') renderSettings();
+}
+
+// ====== SIDEBAR COLLAPSE ======
+function toggleSidebar() {
+  const collapsed = document.body.classList.toggle('sidebar-collapsed');
+  try { localStorage.setItem('flowdesk_sidebar', collapsed ? '1' : '0'); } catch(_){}
+}
+(function initSidebarPref() {
+  try { if (localStorage.getItem('flowdesk_sidebar') === '1') document.body.classList.add('sidebar-collapsed'); } catch(_){}
+})();
+
+// ====== IMPORT GATING (admin only) ======
+function triggerImport() {
+  if (currentUser?.role !== 'admin') { toast('Only admins can import.', 'error'); return; }
+  document.getElementById('importFile').click();
 }
 
 // ====== INIT ======
