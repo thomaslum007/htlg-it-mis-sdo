@@ -1614,8 +1614,8 @@ function renderWorkstreams() {
           <div style="font-size:12px;color:var(--text3);margin-top:2px;font-family:var(--mono);">${w.dept}</div>
         </div>
         <div style="display:flex;gap:6px;">
-          ${currentUser?.role==='admin' ? `<button class="btn btn-ghost btn-sm" onclick="openWorkstreamModal(${w.id})">Edit</button>` : ''}
-          ${currentUser?.role==='admin' ? `<button class="btn btn-danger btn-sm" onclick="deleteWorkstream(${w.id})">Delete</button>` : ''}
+          ${currentUser?.role==='admin' ? `<button class="btn btn-ghost btn-sm" onclick="openWorkstreamModal('${w.id}')">Edit</button>` : ''}
+          ${currentUser?.role==='admin' ? `<button class="btn btn-danger btn-sm" onclick="deleteWorkstream('${w.id}')">Delete</button>` : ''}
         </div>
       </div>
       <div style="font-size:13px;color:var(--text2);">${w.desc}</div>
