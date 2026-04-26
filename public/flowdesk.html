@@ -1763,10 +1763,11 @@ function settingsTab(tab, el) {
   el.classList.add('active');
   if (tab==='users') renderUsers();
   if (tab==='permissions') renderPermissions();
+  if (tab==='dashboard') renderDashboardSegments();
 }
 
 function renderSettings() {
-  renderTypeList(); renderPriorityList(); renderLabelList(); renderStatusList(); renderUsers(); renderPermissions();
+  renderTypeList(); renderPriorityList(); renderLabelList(); renderStatusList(); renderUsers(); renderPermissions(); renderDashboardSegments();
 }
 
 function renderTypeList() {
