@@ -2037,6 +2037,89 @@ function toast(msg, type='info') {
 document.addEventListener('keydown', e => { if (e.key==='Escape') document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(m=>m.classList.add('hidden')); });
 document.addEventListener('keydown', e => { if (e.key==='n' && e.ctrlKey) { e.preventDefault(); openNewIssue(); } });
 
+// Enter-key submits login form
+document.addEventListener('DOMContentLoaded', () => {
+  ['loginUser','loginPass'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); doLogin(); }
+    });
+  });
+});
+
+// ====== FOCUS PAGE (my assigned items) ======
+function renderFocus() {
+  const tbody = document.getElementById('focusTbody');
+  if (!tbody || !currentUser) return;
+  // Reuse the issue filters but always restrict to current user as assignee
+  const all = getFilteredIssues('focus').filter(i => (i.assignee||'') === currentUser.name);
+  if (!all.length) { tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text3);">No items assigned to you.</td></tr>`; updateFocusCount(); return; }
+  tbody.innerHTML = all.map(i => {
+    const canEdit = canEditIssue(i);
+    const canDelete = currentUser?.role === 'admin';
+    const labels = (i.labels||[]).map(l => { const lb = DB.labels.find(x => (x.name||x) === l); const c = (lb?.color)||'#6c63ff'; return `<span class="badge" style="background:${c}22;color:${c};margin:1px;">${escapeHtml(l)}</span>`; }).join('');
+    return `<tr ${canEdit ? `onclick="openEditIssue('${i.id}')"` : ''}>
+      <td><span class="mono text-sm text-muted">#${escapeHtml(String(i.id).slice(0,6))}</span></td>
+      <td><b>${escapeHtml(i.title)}</b></td>
+      <td><span class="badge badge-${(i.type||'').toLowerCase()}">${escapeHtml(i.type||'')}</span></td>
+      <td><span class="badge badge-${(i.status||'').toLowerCase().replace(/\s+/g,'')}">${escapeHtml(i.status||'')}</span></td>
+      <td><span class="prio-dot prio-${(i.priority||'').toLowerCase()}"></span> ${escapeHtml(i.priority||'')}</td>
+      <td>${escapeHtml(i.workstream||'')}</td>
+      <td class="mono text-sm">${escapeHtml(i.start||'')}</td>
+      <td class="mono text-sm">${escapeHtml(i.end||'')}</td>
+      <td>${labels}</td>
+      <td onclick="event.stopPropagation()">
+        ${canEdit ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="openEditIssue('${i.id}')" title="Edit">✏️</button>` : ''}
+        ${canDelete ? `<button class="btn btn-danger btn-sm btn-icon" onclick="deleteIssue('${i.id}')" title="Delete">🗑</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+  updateFocusCount();
+}
+function updateFocusCount() {
+  const el = document.getElementById('focusCount');
+  if (!el || !currentUser) { if (el) el.textContent='0'; return; }
+  const n = DB.issues.filter(i => (i.assignee||'') === currentUser.name && i.status !== 'Done').length;
+  el.textContent = n;
+}
+
+// ====== DASHBOARD SEGMENTS (admin-editable status mapping) ======
+function renderDashboardSegments() {
+  const host = document.getElementById('segEditor');
+  if (!host) return;
+  const seg = DB.dashboardSegments || { in_progress:[], completed:[], need_attention:[] };
+  const isAdmin = currentUser?.role === 'admin';
+  const saveBtn = document.getElementById('saveSegBtn');
+  if (saveBtn) saveBtn.style.display = isAdmin ? '' : 'none';
+  const buckets = [
+    { key: 'in_progress',    label: 'In Progress' },
+    { key: 'completed',      label: 'Completed' },
+    { key: 'need_attention', label: 'Need Attention' },
+  ];
+  host.innerHTML = buckets.map(b => `
+    <div class="seg-card">
+      <h4>${escapeHtml(b.label)}</h4>
+      <div class="seg-opts">
+        ${DB.statuses.map(s => {
+          const checked = (seg[b.key]||[]).includes(s.name) ? 'checked' : '';
+          return `<label><input type="checkbox" data-bucket="${b.key}" data-status="${escapeAttr(s.name)}" ${checked} ${isAdmin?'':'disabled'}> ${escapeHtml(s.name)}</label>`;
+        }).join('')}
+      </div>
+    </div>`).join('');
+}
+function saveDashboardSegments() {
+  if (currentUser?.role !== 'admin') { toast('Only admins can edit segments.', 'error'); return; }
+  const seg = { in_progress:[], completed:[], need_attention:[] };
+  document.querySelectorAll('#segEditor input[type=checkbox]').forEach(cb => {
+    if (cb.checked) seg[cb.dataset.bucket].push(cb.dataset.status);
+  });
+  DB.dashboardSegments = seg;
+  Cloud.saveSetting('dashboard_segments', seg);
+  renderDashboard();
+  toast('Dashboard segments saved', 'success');
+}
+
 // ====== THEME ======
 function toggleTheme() {
   const isLight = document.body.classList.toggle('theme-light');
