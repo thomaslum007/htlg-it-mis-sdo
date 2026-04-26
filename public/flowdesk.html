@@ -1854,7 +1854,7 @@ function updatePerm(role, page, action, val) {
 
 function savePermissions() {
   if (currentUser?.role !== 'admin') { toast('Only admins can change permissions.', 'error'); return; }
-  try { localStorage.setItem('flowdesk_permissions', JSON.stringify(DB.permissions)); } catch(_) {}
+  Cloud.saveSetting('roles_perm', Cloud.permissionsToDB());
   applyRoleVisibility();
   toast('Permissions saved', 'success');
 }
@@ -1863,7 +1863,7 @@ function resetPermissions() {
   if (currentUser?.role !== 'admin') return;
   if (!confirm('Reset all role permissions to defaults?')) return;
   DB.permissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
-  try { localStorage.setItem('flowdesk_permissions', JSON.stringify(DB.permissions)); } catch(_) {}
+  Cloud.saveSetting('roles_perm', Cloud.permissionsToDB());
   applyRoleVisibility();
   renderPermissions();
   toast('Permissions reset', 'info');
