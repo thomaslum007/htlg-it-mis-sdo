@@ -1021,64 +1021,45 @@ function canEditIssue(issue) {
   return issue && issue.createdBy === currentUser.id;
 }
 
-// ====== SEED SAMPLE ISSUES ======
-function seedIssues() {
-  if (appSeeded || DB.issues.length) return; // fix: never seed twice
-  appSeeded = true;
-  const titles = [
-    'Fix login page redirect on mobile', 'Implement OAuth2 integration', 'Database query optimization',
-    'Design onboarding flow', 'API rate limiting middleware', 'Fix CSV export encoding',
-    'Add dark mode toggle', 'User profile page redesign', 'Kubernetes deployment config',
-    'Password reset email template', 'Implement search indexing', 'Fix sidebar z-index bug'
-  ];
-  const today = new Date();
-  titles.forEach((title, i) => {
-    const start = new Date(today); start.setDate(start.getDate() - Math.floor(Math.random()*20));
-    const end = new Date(start); end.setDate(end.getDate() + 5 + Math.floor(Math.random()*20));
-    DB.issues.push({
-      id: DB.nextIssueId++,
-      title,
-      type: DB.types[i % DB.types.length].name,
-      status: DB.statuses[i % DB.statuses.length].name,
-      priority: DB.priorities[i % DB.priorities.length],
-      assignee: DB.users[i % DB.users.length].name,
-      workstream: DB.workstreams[i % DB.workstreams.length].name,
-      labels: [DB.labels[i % DB.labels.length].name],
-      start: fmtDate(start), end: fmtDate(end),
-      desc: 'Sample issue description for testing purposes.',
-      checklist: [
-        { text: 'Review requirements', done: i % 3 === 0 },
-        { text: 'Implementation', done: false },
-        { text: 'Write tests', done: false }
-      ],
-      createdBy: DB.users[i % DB.users.length].id,
-      createdByName: DB.users[i % DB.users.length].name,
-      created: new Date().toISOString()
-    });
-  });
-}
+// Sample issues are no longer client-seeded; data lives in the cloud DB.
+function seedIssues() { /* no-op: data comes from Cloud.loadAll() */ }
 
 function fmtDate(d) {
   return d.toISOString().split('T')[0];
 }
 
 // ====== AUTH ======
-function doLogin() {
+async function doLogin() {
   const u = document.getElementById('loginUser').value.trim();
   const p = document.getElementById('loginPass').value.trim();
-  const user = DB.users.find(x => x.username === u && x.password === p);
-  if (!user) { document.getElementById('loginError').style.display = 'block'; return; }
-  currentUser = user;
+  if (!u || !p) { document.getElementById('loginError').textContent = 'Enter username and password.'; document.getElementById('loginError').style.display='block'; return; }
+  try {
+    const sb = await Cloud.waitForClient();
+    const { data, error } = await sb.from('app_users').select('*').eq('username', u).maybeSingle();
+    if (error) throw error;
+    if (!data || data.password !== p) {
+      document.getElementById('loginError').textContent = 'Invalid username or password.';
+      document.getElementById('loginError').style.display = 'block';
+      return;
+    }
+    currentUser = Cloud.mapUserFromDB(data);
+  } catch (err) {
+    console.error('login', err);
+    document.getElementById('loginError').textContent = 'Login failed: ' + (err.message||'unknown error');
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('app').style.display = 'flex';
   document.body.classList.remove('login-mode');
-  document.getElementById('sidebarUsername').textContent = user.name;
-  document.getElementById('sidebarRole').textContent = user.role.toUpperCase();
-  document.getElementById('sidebarAvatar').textContent = user.name[0];
-  initApp();
+  document.getElementById('sidebarUsername').textContent = currentUser.name;
+  document.getElementById('sidebarRole').textContent = (currentUser.role||'').toUpperCase();
+  document.getElementById('sidebarAvatar').textContent = currentUser.name[0];
+  await initApp();
 }
 function doLogout() {
+  Cloud.unsubscribe();
   currentUser = null;
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
@@ -1111,14 +1092,16 @@ function nav(page, el) {
 }
 
 // ====== INIT ======
-function initApp() {
-  initPermissions();
-  seedIssues();
+async function initApp() {
+  try { await Cloud.loadAll(); }
+  catch (e) { console.error('Cloud.loadAll failed', e); toast('Failed to load workspace data','error'); }
+  initPermissions(); // ensures DB.permissions exists even if settings row missing
   buildFilterUI();
   populateFilters();
   applyRoleVisibility();
   renderDashboard();
   updateOpenCount();
+  Cloud.subscribe(cloudHandleChange);
 }
 
 function updateOpenCount() {
