@@ -951,18 +951,8 @@ function rerenderActivePage() {
 // ===================== DATA STORE =====================
 let DB = {
   issues: [],
-  users: [
-    { id: 1, name: 'Alice Admin', username: 'admin', password: 'admin123', email: 'alice@company.com', role: 'admin', dept: 'Management', responsibilities: 'Full system access, user management' },
-    { id: 2, name: 'Bob PM', username: 'bob', password: 'bob123', email: 'bob@company.com', role: 'pm', dept: 'Product', responsibilities: 'Sprint planning, backlog grooming' },
-    { id: 3, name: 'Carol Dev', username: 'carol', password: 'carol123', email: 'carol@company.com', role: 'dev', dept: 'Engineering', responsibilities: 'Frontend development, code reviews' },
-    { id: 4, name: 'Dave Dev', username: 'dave', password: 'dave123', email: 'dave@company.com', role: 'dev', dept: 'Engineering', responsibilities: 'Backend development, DevOps' },
-  ],
-  workstreams: [
-    { id: 1, name: 'Frontend', dept: 'Engineering', desc: 'UI/UX development and web components', color: '#6c63ff' },
-    { id: 2, name: 'Backend API', dept: 'Engineering', desc: 'Server, database and API development', color: '#14b8a6' },
-    { id: 3, name: 'Product Design', dept: 'Product', desc: 'User research, wireframes, prototypes', color: '#ec4899' },
-    { id: 4, name: 'DevOps', dept: 'Infrastructure', desc: 'CI/CD, deployments, monitoring', color: '#f59e0b' },
-  ],
+  users: [],
+  workstreams: [],
   labels: [
     { name: 'UI', color: '#6c63ff' },
     { name: 'API', color: '#14b8a6' },
@@ -987,12 +977,10 @@ let DB = {
   ],
   priorities: ['Critical', 'High', 'Medium', 'Low'],
   activity: [],
-  nextIssueId: 1,
-  nextUserId: 5,
-  nextWsId: 5,
   // Per-role tab permissions: view + interact (edit/create/drag)
   // Pages: dashboard, issues, kanban, gantt, workstreams, settings
   permissions: null, // populated by initPermissions()
+  dashboardSegments: { in_progress:['In Progress','In Review'], completed:['Done'], need_attention:['Blocked'] },
 };
 
 let currentUser = null;
