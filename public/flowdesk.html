@@ -1505,7 +1505,7 @@ function renderKanban() {
 function kanbanCard(i, canDrag) {
   const prioColors = { Critical:'var(--critical)', High:'var(--high)', Medium:'var(--medium)', Low:'var(--low)' };
   const editable = canEditIssue(i);
-  return `<div class="kanban-card" ${canDrag?'draggable="true"':''} ${canDrag?`ondragstart="dragStart(event,${i.id})" ondragend="dragEnd(event)"`:''} ${editable?`onclick="openEditIssue(${i.id})"`:''} style="${!canDrag?'cursor:default;':''}">
+  return `<div class="kanban-card" ${canDrag?'draggable="true"':''} ${canDrag?`ondragstart="dragStart(event,'${i.id}')" ondragend="dragEnd(event)"`:''} ${editable?`onclick="openEditIssue('${i.id}')"`:''} style="${!canDrag?'cursor:default;':''}">
     <div class="kanban-card-title">${i.title}</div>
     <div class="kanban-card-meta">
       <span class="badge badge-${i.type.toLowerCase()}" style="font-size:10px;">${i.type}</span>
