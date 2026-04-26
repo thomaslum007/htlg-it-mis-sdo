@@ -1242,10 +1242,10 @@ function logActivity(text) {
 }
 
 // ====== ISSUES ======
-const FILTER_SCOPES = ['iss','dash','kan','gan'];
+const FILTER_SCOPES = ['iss','dash','kan','gan','focus'];
 // ====== MULTI-SELECT FILTERS (per-tab, isolated) ======
 // State: { [scope]: { Type:Set, Status:Set, Priority:Set, Assignee:Set, Workstream:Set } }
-const FILTER_KEYS = ['Type','Status','Priority','Assignee','Workstream'];
+const FILTER_KEYS = ['Type','Status','Priority','Assignee','Workstream','Labels'];
 const filterState = {};
 FILTER_SCOPES.forEach(s => { filterState[s] = {}; FILTER_KEYS.forEach(k => filterState[s][k] = new Set()); });
 
@@ -1256,12 +1256,13 @@ function getFilterOptions(key) {
     case 'Priority': return [...DB.priorities];
     case 'Assignee': return DB.users.map(u=>u.name);
     case 'Workstream': return DB.workstreams.map(w=>w.name);
+    case 'Labels': return DB.labels.map(l => typeof l==='string' ? l : l.name);
   }
   return [];
 }
 
 function buildFilterUI() {
-  const scopeRender = { iss: renderIssues, dash: renderDashboard, kan: renderKanban, gan: renderGantt };
+  const scopeRender = { iss: renderIssues, dash: renderDashboard, kan: renderKanban, gan: renderGantt, focus: renderFocus };
   FILTER_SCOPES.forEach(scope => {
     const row = document.getElementById(`${scope}_filterRow`);
     if (!row) return;
@@ -1322,6 +1323,7 @@ function rerenderScope(scope) {
   else if (scope==='dash') renderDashboard();
   else if (scope==='kan') renderKanban();
   else if (scope==='gan') renderGantt();
+  else if (scope==='focus') renderFocus();
 }
 
 // Refresh option lists when underlying data (types/users/etc.) changes — preserves selections
