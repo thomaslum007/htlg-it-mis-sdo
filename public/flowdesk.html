@@ -1171,8 +1171,11 @@ async function initApp() {
   buildFilterUI();
   populateFilters();
   applyRoleVisibility();
-  renderDashboard();
+  // Default landing tab is Dashboard
+  const dashNav = document.querySelector('.sidebar .nav-item');
+  nav('dashboard', dashNav);
   updateOpenCount();
+  updateFocusCount();
   Cloud.subscribe(cloudHandleChange);
 }
 
