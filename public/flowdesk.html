@@ -1946,16 +1946,19 @@ function resetPermissions() {
 
 // Hide nav items for pages the current user cannot view
 function applyRoleVisibility() {
-  const navMap = { dashboard:0, issues:1, kanban:2, gantt:3, workstreams:4, settings:5 };
   const items = document.querySelectorAll('.sidebar .nav-item');
-  Object.entries(navMap).forEach(([page, idx]) => {
+  // Order in DOM matches: dashboard, issues, kanban, gantt, focus, workstreams, settings
+  const order = ['dashboard','issues','kanban','gantt','focus','workstreams','settings'];
+  order.forEach((page, idx) => {
     const item = items[idx];
     if (!item) return;
     item.style.display = can('view', page) ? '' : 'none';
   });
-  // Hide "+ New Issue" if no interact on issues
   const newBtn = document.querySelector('.topbar .btn-primary');
   if (newBtn) newBtn.style.display = can('interact','issues') ? '' : 'none';
+  // Import is admin-only
+  const importBtn = document.getElementById('importBtn');
+  if (importBtn) importBtn.style.display = currentUser?.role === 'admin' ? '' : 'none';
 }
 
 // ====== EXCEL IMPORT/EXPORT ======
