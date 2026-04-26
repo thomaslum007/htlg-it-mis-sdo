@@ -1315,7 +1315,7 @@ function renderIssues() {
     const canEdit = canEditIssue(i);
     const canDelete = currentUser?.role === 'admin';
     const labels = (i.labels||[]).map(l => { const lb = DB.labels.find(x=>x.name===l); return `<span class="badge" style="background:${(lb?.color||'#6c63ff')}22;color:${lb?.color||'#6c63ff'};margin:1px;">${l}</span>`; }).join('');
-    return `<tr onclick="${canEdit ? `openEditIssue(${i.id})` : ''}">
+    return `<tr onclick="${canEdit ? `openEditIssue('${i.id}')` : ''}">
       <td class="mono" style="color:var(--text3);font-size:11px;">#${i.id}</td>
       <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;">${i.title}</td>
       <td><span class="badge badge-${i.type.toLowerCase()}">${i.type}</span></td>
