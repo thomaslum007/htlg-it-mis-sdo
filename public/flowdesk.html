@@ -1328,8 +1328,8 @@ function renderIssues() {
       <td>${labels||'—'}</td>
       <td onclick="event.stopPropagation()">
         <div style="display:flex;gap:4px;">
-          ${canEdit ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="openEditIssue(${i.id})" title="Edit">✏️</button>` : ''}
-          ${canDelete ? `<button class="btn btn-danger btn-sm btn-icon" onclick="deleteIssue(${i.id})" title="Delete">🗑</button>` : ''}
+          ${canEdit ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="openEditIssue('${i.id}')" title="Edit">✏️</button>` : ''}
+          ${canDelete ? `<button class="btn btn-danger btn-sm btn-icon" onclick="deleteIssue('${i.id}')" title="Delete">🗑</button>` : ''}
         </div>
       </td>
     </tr>`;
