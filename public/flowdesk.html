@@ -1910,9 +1910,9 @@ function importExcel(input) {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws);
       let imported = 0;
+      const promises = [];
       rows.forEach(row => {
         if (!row.Title) return;
-        const existing = row.ID ? DB.issues.find(i=>i.id===parseInt(row.ID)) : null;
         let checklist = [];
         if (row.Checklist) {
           try {
@@ -1924,13 +1924,15 @@ function importExcel(input) {
           title: row.Title, type: row.Type||'Task', status: row.Status||'To Do',
           priority: row.Priority||'Medium', assignee: row.Assignee||'',
           workstream: row.Workstream||'', labels: row.Labels?row.Labels.split(',').map(l=>l.trim()):[],
-          start: row.StartDate||'', end: row.EndDate||'', desc: row.Description||'', checklist, created: new Date().toISOString()
+          start: row.StartDate||'', end: row.EndDate||'', desc: row.Description||'', checklist,
+          createdBy: currentUser?.id||null, createdByName: currentUser?.name||'System'
         };
-        if (existing) { Object.assign(existing, issue); }
-        else { DB.issues.push({id:DB.nextIssueId++,...issue}); imported++; }
+        promises.push(Cloud.upsertIssue(issue).then(saved => { if (saved) { DB.issues.push(saved); imported++; }}));
       });
-      toast(`Imported ${imported} new issues`, 'success');
-      renderIssues(); updateOpenCount(); populateFilters();
+      Promise.allSettled(promises).then(() => {
+        toast(`Imported ${imported} issues`, 'success');
+        renderIssues(); updateOpenCount(); populateFilters();
+      });
     } catch(err) { toast('Import failed: ' + err.message, 'error'); }
     input.value='';
   };
