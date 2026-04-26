@@ -1345,12 +1345,13 @@ function getFilteredIssues(scope) {
   scope = scope || 'iss';
   const f = filterState[scope] || {};
   let list = [...DB.issues];
-  const st = f.Status, pr = f.Priority, ty = f.Type, as = f.Assignee, ws = f.Workstream;
+  const st = f.Status, pr = f.Priority, ty = f.Type, as = f.Assignee, ws = f.Workstream, lb = f.Labels;
   if (st && st.size) list = list.filter(i => st.has(i.status));
   if (pr && pr.size) list = list.filter(i => pr.has(i.priority));
   if (ty && ty.size) list = list.filter(i => ty.has(i.type));
   if (as && as.size) list = list.filter(i => as.has(i.assignee));
   if (ws && ws.size) list = list.filter(i => ws.has(i.workstream));
+  if (lb && lb.size) list = list.filter(i => (i.labels||[]).some(l => lb.has(l)));
   const gs = document.getElementById('globalSearch')?.value.toLowerCase();
   if (gs) list = list.filter(i => i.title.toLowerCase().includes(gs) || (i.desc||'').toLowerCase().includes(gs) || String(i.id).includes(gs));
   return list;
