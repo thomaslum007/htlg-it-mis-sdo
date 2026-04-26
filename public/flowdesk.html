@@ -1747,8 +1747,8 @@ function renderUsers() {
     <td><span class="role-badge role-${u.role}">${u.role}</span></td>
     <td style="font-size:12px;color:var(--text2);">${u.dept||'—'}</td>
     <td><div style="display:flex;gap:4px;">
-      ${currentUser?.role==='admin' ? `<button class="btn btn-ghost btn-sm" onclick="openUserModal(${u.id})">Edit</button>` : ''}
-      ${currentUser?.role==='admin' && u.id!==currentUser.id ? `<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">Delete</button>` : ''}
+      ${currentUser?.role==='admin' ? `<button class="btn btn-ghost btn-sm" onclick="openUserModal('${u.id}')">Edit</button>` : ''}
+      ${currentUser?.role==='admin' && u.id!==currentUser.id ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">Delete</button>` : ''}
     </div></td>
   </tr>`).join('');
 }
