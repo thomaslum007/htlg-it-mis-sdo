@@ -1788,11 +1788,13 @@ function saveUser() {
   if (pw) data.password = pw;
   if (editingUserId) {
     const idx = DB.users.findIndex(u=>u.id===editingUserId);
-    DB.users[idx]={...DB.users[idx],...data};
+    const merged = { ...DB.users[idx], ...data };
+    DB.users[idx] = merged;
+    Cloud.upsertUser(merged).then(saved => { if (saved) { const i = DB.users.findIndex(x=>x.id===saved.id); if (i>=0) DB.users[i]=saved; renderUsers(); populateFilters(); }});
     toast('User updated','success');
   } else {
     if (!pw) { toast('Password required for new user','error'); return; }
-    DB.users.push({id:DB.nextUserId++,password:pw,...data});
+    Cloud.upsertUser({ password: pw, ...data }).then(saved => { if (saved) { DB.users.push(saved); renderUsers(); populateFilters(); }});
     toast('User created','success');
   }
   closeModal('userModal'); renderUsers(); populateFilters();
@@ -1801,6 +1803,7 @@ function saveUser() {
 function deleteUser(id) {
   if (!confirm('Delete this user?')) return;
   DB.users = DB.users.filter(u=>u.id!==id);
+  Cloud.deleteUser(id);
   renderUsers(); toast('User deleted','info');
 }
 
