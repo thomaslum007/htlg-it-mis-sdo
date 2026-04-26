@@ -343,6 +343,28 @@ textarea { resize: vertical; min-height: 80px; }
 .perm-cell { display: inline-flex; gap: 4px; }
 .perm-cell label { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-family: var(--mono); color: var(--text2); text-transform: none; letter-spacing: 0; cursor: pointer; margin: 0; }
 .perm-cell input { accent-color: var(--accent); cursor: pointer; }
+/* Collapsible sidebar */
+body.sidebar-collapsed { --sidebar-w: 64px; }
+body.sidebar-collapsed .nav-label,
+body.sidebar-collapsed .logo-text,
+body.sidebar-collapsed .logo-sub,
+body.sidebar-collapsed .user-info,
+body.sidebar-collapsed .nav-item span:not(.icon):not(.nav-badge),
+body.sidebar-collapsed .sidebar-footer .btn-ghost { display: none; }
+body.sidebar-collapsed .nav-item { justify-content: center; padding: 8px; }
+body.sidebar-collapsed .nav-item .nav-badge { position: absolute; top: 2px; right: 2px; }
+body.sidebar-collapsed .nav-item { position: relative; }
+body.sidebar-collapsed .logo { padding: 16px 8px; text-align: center; }
+body.sidebar-collapsed .logo-mark { justify-content: center; }
+body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
+.sidebar-toggle { background: var(--surface2); border: 1px solid var(--border); color: var(--text2); width: 28px; height: 28px; border-radius: var(--radius); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; }
+.sidebar-toggle:hover { background: var(--surface3); color: var(--text); }
+/* Dashboard segments editor */
+.seg-editor { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.seg-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+.seg-card h4 { font-size: 12px; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--text2); }
+.seg-opts label { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; cursor: pointer; text-transform: none; letter-spacing: 0; font-family: var(--font); margin: 0; color: var(--text); }
+.seg-opts input { accent-color: var(--accent); }
 </style>
 </head>
 <body>
