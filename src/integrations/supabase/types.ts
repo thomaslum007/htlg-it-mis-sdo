@@ -14,7 +14,186 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activities: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          id: string
+          target: string | null
+          target_id: string | null
+          user_id: string | null
+          user_name: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target?: string | null
+          target_id?: string | null
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target?: string | null
+          target_id?: string | null
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Relationships: []
+      }
+      app_users: {
+        Row: {
+          avatar_color: string | null
+          created_at: string
+          dept: string | null
+          email: string | null
+          id: string
+          name: string
+          password: string
+          role: string
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          avatar_color?: string | null
+          created_at?: string
+          dept?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          password: string
+          role?: string
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          avatar_color?: string | null
+          created_at?: string
+          dept?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          password?: string
+          role?: string
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      issues: {
+        Row: {
+          assignee: string | null
+          checklist: Json
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          description: string | null
+          end_date: string | null
+          id: string
+          key: string | null
+          labels: Json
+          priority: string | null
+          start_date: string | null
+          status: string | null
+          title: string
+          type: string | null
+          updated_at: string
+          workstream: string | null
+        }
+        Insert: {
+          assignee?: string | null
+          checklist?: Json
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          key?: string | null
+          labels?: Json
+          priority?: string | null
+          start_date?: string | null
+          status?: string | null
+          title: string
+          type?: string | null
+          updated_at?: string
+          workstream?: string | null
+        }
+        Update: {
+          assignee?: string | null
+          checklist?: Json
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          key?: string | null
+          labels?: Json
+          priority?: string | null
+          start_date?: string | null
+          status?: string | null
+          title?: string
+          type?: string | null
+          updated_at?: string
+          workstream?: string | null
+        }
+        Relationships: []
+      }
+      settings_kv: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
+      workstreams: {
+        Row: {
+          color: string | null
+          created_at: string
+          dept: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          dept?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          dept?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
