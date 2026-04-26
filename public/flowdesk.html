@@ -1657,14 +1657,23 @@ function saveWorkstream() {
   const name = document.getElementById('wsName').value.trim();
   if (!name) { toast('Workstream name required','error'); return; }
   const data = { name, dept: document.getElementById('wsDept').value, desc: document.getElementById('wsDesc').value, color: document.getElementById('wsColor').value };
-  if (editingWsId) { const idx = DB.workstreams.findIndex(w=>w.id===editingWsId); DB.workstreams[idx]={...DB.workstreams[idx],...data}; toast('Workstream updated','success'); }
-  else { DB.workstreams.push({id:DB.nextWsId++,...data}); toast('Workstream created','success'); }
+  if (editingWsId) {
+    const idx = DB.workstreams.findIndex(w=>w.id===editingWsId);
+    const merged = { ...DB.workstreams[idx], ...data };
+    DB.workstreams[idx] = merged;
+    Cloud.upsertWorkstream(merged).then(saved => { if (saved) { const i = DB.workstreams.findIndex(x=>x.id===saved.id); if (i>=0) DB.workstreams[i]=saved; renderWorkstreams(); populateFilters(); }});
+    toast('Workstream updated','success');
+  } else {
+    Cloud.upsertWorkstream(data).then(saved => { if (saved) { DB.workstreams.push(saved); renderWorkstreams(); populateFilters(); }});
+    toast('Workstream created','success');
+  }
   closeModal('workstreamModal'); renderWorkstreams(); populateFilters();
 }
 
 function deleteWorkstream(id) {
   if (!confirm('Delete this workstream?')) return;
   DB.workstreams = DB.workstreams.filter(w=>w.id!==id);
+  Cloud.deleteWorkstream(id);
   renderWorkstreams(); populateFilters(); toast('Workstream deleted','info');
 }
 
