@@ -498,6 +498,27 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
     </div>
   </div>
 
+  <!-- FOCUS (only items assigned to me) -->
+  <div class="content page hidden" id="page-focus">
+    <div class="filter-bar">
+      <div class="filter-title">Filters</div>
+      <div class="filter-row" id="focus_filterRow"></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Title</th><th>Type</th><th>Status</th><th>Priority</th>
+              <th>Workstream</th><th>Start</th><th>End</th><th>Labels</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="focusTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- KANBAN -->
   <div class="content page hidden" id="page-kanban">
     <div class="filter-bar">
