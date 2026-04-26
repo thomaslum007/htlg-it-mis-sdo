@@ -6,6 +6,15 @@
 <title>FlowDesk — Project Management Suite</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script type="module">
+  // Expose a Supabase client globally so the legacy inline script can use it.
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+  const SUPABASE_URL = 'https://rldmpekyygxhprwgifnn.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJsZG1wZWt5eWd4aHByd2dpZm5uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNTI2MDMsImV4cCI6MjA5MjcyODYwM30.McMxrOQzRhMqcPH461lF8jq8_OpsPXp3z4YP57YKTVU';
+  window.sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+  window.sbReady = true;
+  window.dispatchEvent(new Event('sb-ready'));
+</script>
 <style>
 :root {
   --bg: #0f0f13;
