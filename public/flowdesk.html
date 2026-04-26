@@ -1964,6 +1964,12 @@ function applyRoleVisibility() {
   // Import is admin-only
   const importBtn = document.getElementById('importBtn');
   if (importBtn) importBtn.style.display = currentUser?.role === 'admin' ? '' : 'none';
+  // Workstreams: only show "+ New Workstream" if can interact
+  const wsNewBtn = document.querySelector('#page-workstreams .btn-primary');
+  if (wsNewBtn) wsNewBtn.style.display = can('interact','workstreams') ? '' : 'none';
+  // Users: only admin can add users
+  const addUserBtn = document.getElementById('addUserBtn');
+  if (addUserBtn) addUserBtn.style.display = currentUser?.role === 'admin' ? '' : 'none';
 }
 
 // ====== EXCEL IMPORT/EXPORT ======
