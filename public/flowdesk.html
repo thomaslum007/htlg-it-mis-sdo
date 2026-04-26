@@ -1711,6 +1711,7 @@ function renderWorkstreams() {
 }
 
 function openWorkstreamModal(id) {
+  if (!can('interact','workstreams')) { toast('You do not have permission to manage workstreams.', 'error'); return; }
   editingWsId = id || null;
   if (id) {
     const ws = DB.workstreams.find(w=>w.id===id);
