@@ -834,7 +834,7 @@ const Cloud = {
   async loadAll() {
     const sb = await this.waitForClient();
     const [p, r, w, i, a, s] = await Promise.all([
-      sb.from('profiles').select('*').order('created_at'),
+      sb.rpc('list_profiles_public'),
       sb.from('user_roles').select('user_id,role'),
       sb.from('workstreams').select('*').order('created_at'),
       sb.from('issues').select('*').order('created_at'),
@@ -1010,7 +1010,7 @@ async function cloudHandleChange(kind) {
     if (data) DB.workstreams = data.map(Cloud.mapWsFromDB);
   } else if (kind === 'users') {
     const [p, r] = await Promise.all([
-      sb.from('profiles').select('*').order('created_at'),
+      sb.rpc('list_profiles_public'),
       sb.from('user_roles').select('user_id,role'),
     ]);
     const roleByUser = {};
