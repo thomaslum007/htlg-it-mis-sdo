@@ -1188,15 +1188,16 @@ function updateOpenCount() {
 function renderDashboard() {
   const issues = getFilteredIssues('dash');
   const total = issues.length;
-  const done = issues.filter(i => i.status === 'Done').length;
-  const inprog = issues.filter(i => i.status === 'In Progress').length;
-  const blocked = issues.filter(i => i.status === 'Blocked').length;
-  const critical = issues.filter(i => i.priority === 'Critical').length;
+  const seg = DB.dashboardSegments || { in_progress:['In Progress'], completed:['Done'], need_attention:['Blocked'] };
+  const inSeg = (i, key) => Array.isArray(seg[key]) && seg[key].includes(i.status);
+  const inprog = issues.filter(i => inSeg(i, 'in_progress')).length;
+  const done   = issues.filter(i => inSeg(i, 'completed')).length;
+  const attn   = issues.filter(i => inSeg(i, 'need_attention') || i.priority === 'Critical').length;
   document.getElementById('statCards').innerHTML = `
     <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">Total Issues</div></div>
     <div class="stat-card"><div class="stat-num" style="color:var(--blue)">${inprog}</div><div class="stat-label">In Progress</div></div>
     <div class="stat-card"><div class="stat-num" style="color:var(--green)">${done}</div><div class="stat-label">Completed</div></div>
-    <div class="stat-card"><div class="stat-num" style="color:var(--red)">${blocked + critical}</div><div class="stat-label">Needs Attention</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--red)">${attn}</div><div class="stat-label">Needs Attention</div></div>
   `;
   renderStatusChart(issues);
   renderPriorityChart(issues);
