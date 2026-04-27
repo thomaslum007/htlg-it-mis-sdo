@@ -2184,15 +2184,16 @@ function toast(msg, type='info') {
 document.addEventListener('keydown', e => { if (e.key==='Escape') document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(m=>m.classList.add('hidden')); });
 document.addEventListener('keydown', e => { if (e.key==='n' && e.ctrlKey) { e.preventDefault(); openNewIssue(); } });
 
-// Enter-key submits login form
+// Enter-key submits login form + initial tab styling
 document.addEventListener('DOMContentLoaded', () => {
-  ['loginUser','loginPass'].forEach(id => {
+  ['loginUser','loginPass','signupName'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); doLogin(); }
+      if (e.key === 'Enter') { e.preventDefault(); doAuthSubmit(); }
     });
   });
+  if (typeof switchAuthTab === 'function') switchAuthTab('signin');
 });
 
 // ====== FOCUS PAGE (my assigned items) ======
