@@ -834,14 +834,23 @@ const Cloud = {
   },
   async loadAll() {
     const sb = await this.waitForClient();
-    const [u, w, i, a, s] = await Promise.all([
-      sb.from('app_users').select('*').order('created_at'),
+    const [p, r, w, i, a, s] = await Promise.all([
+      sb.from('profiles').select('*').order('created_at'),
+      sb.from('user_roles').select('user_id,role'),
       sb.from('workstreams').select('*').order('created_at'),
       sb.from('issues').select('*').order('created_at'),
       sb.from('activities').select('*').order('created_at', { ascending: false }).limit(200),
       sb.from('settings_kv').select('*'),
     ]);
-    if (u.data) DB.users = u.data.map(this.mapUserFromDB);
+    const roleByUser = {};
+    if (r.data) for (const row of r.data) {
+      // Pick the highest-privilege role if multiple exist
+      const rank = { admin:1, pm:2, dev:3, viewer:4 };
+      if (!roleByUser[row.user_id] || rank[row.role] < rank[roleByUser[row.user_id]]) {
+        roleByUser[row.user_id] = row.role;
+      }
+    }
+    if (p.data) DB.users = p.data.map(row => Cloud.mapProfileFromDB(row, roleByUser[row.id] || 'viewer'));
     if (w.data) DB.workstreams = w.data.map(this.mapWsFromDB);
     if (i.data) DB.issues = i.data.map(this.mapIssueFromDB);
     if (a.data) DB.activity = a.data.map(this.mapActivityFromDB).reverse();
@@ -857,8 +866,8 @@ const Cloud = {
     if (map.roles_perm)                DB.permissions = this.mapPermissionsFromDB(map.roles_perm);
     if (map.dashboard_segments)        DB.dashboardSegments = map.dashboard_segments;
   },
-  mapUserFromDB(r) {
-    return { id: r.id, name: r.name, username: r.username, password: r.password, email: r.email||'', role: r.role, dept: r.dept||'', responsibilities: r.responsibilities||'', avatarColor: r.avatar_color };
+  mapProfileFromDB(r, role) {
+    return { id: r.id, name: r.name||'', username: r.username||'', email: r.email||'', role: role||'viewer', dept: r.dept||'', responsibilities: r.responsibilities||'', avatarColor: r.avatar_color };
   },
   mapWsFromDB(r) { return { id: r.id, name: r.name, dept: r.dept||'', desc: r.description||'', color: r.color||'#6c63ff' }; },
   mapIssueFromDB(r) {
@@ -930,20 +939,28 @@ const Cloud = {
     const { error } = await sb.from('workstreams').delete().eq('id', id);
     if (error) { console.error('deleteWorkstream', error); toast('Delete failed','error'); }
   },
-  // ----- Users -----
-  async upsertUser(u) {
+  // ----- Profiles + Roles -----
+  async upsertProfile(u) {
     const sb = await this.waitForClient();
-    const row = { id: u.id, name: u.name, username: u.username, email: u.email||null,
-      role: u.role, dept: u.dept||null };
-    if (u.password) row.password = u.password;
-    const { data, error } = await sb.from('app_users').upsert(row).select().single();
-    if (error) { console.error('upsertUser', error); toast('Save failed: ' + error.message,'error'); return null; }
-    return Cloud.mapUserFromDB(data);
+    if (!u.id) { toast('Cannot create users from this form. Ask the user to sign up.','error'); return null; }
+    const row = { id: u.id, name: u.name, username: u.username||null, email: u.email||null,
+      dept: u.dept||null, responsibilities: u.responsibilities||null };
+    const { data, error } = await sb.from('profiles').update(row).eq('id', u.id).select().single();
+    if (error) { console.error('upsertProfile', error); toast('Save failed: ' + error.message,'error'); return null; }
+    if (u.role) {
+      // Replace role(s) for this user with the chosen role (admin only — RLS enforced)
+      await sb.from('user_roles').delete().eq('user_id', u.id);
+      const { error: re } = await sb.from('user_roles').insert({ user_id: u.id, role: u.role });
+      if (re) { console.error('setRole', re); toast('Role update failed: ' + re.message, 'error'); }
+    }
+    return Cloud.mapProfileFromDB(data, u.role || 'viewer');
   },
-  async deleteUser(id) {
+  async deleteProfile(id) {
     const sb = await this.waitForClient();
-    const { error } = await sb.from('app_users').delete().eq('id', id);
-    if (error) { console.error('deleteUser', error); toast('Delete failed','error'); }
+    // Note: this only deletes the profile row, not the auth.users entry.
+    // Fully removing a user requires an admin edge function with the service role key.
+    const { error } = await sb.from('profiles').delete().eq('id', id);
+    if (error) { console.error('deleteProfile', error); toast('Delete failed: ' + error.message,'error'); }
   },
   // ----- Activity -----
   async logActivity(text) {
@@ -969,7 +986,8 @@ const Cloud = {
     const ch = window.sb.channel('flowdesk-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'issues' },      () => onChange('issues'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'workstreams' }, () => onChange('workstreams'))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_users' },   () => onChange('users'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' },    () => onChange('users'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_roles' },  () => onChange('users'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' },  () => onChange('activities'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings_kv' }, () => onChange('settings'))
       .subscribe();
