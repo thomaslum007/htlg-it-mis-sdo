@@ -11,7 +11,9 @@
   import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
   const SUPABASE_URL = 'https://rldmpekyygxhprwgifnn.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJsZG1wZWt5eWd4aHByd2dpZm5uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNTI2MDMsImV4cCI6MjA5MjcyODYwM30.McMxrOQzRhMqcPH461lF8jq8_OpsPXp3z4YP57YKTVU';
-  window.sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+  window.sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, storage: localStorage }
+  });
   window.sbReady = true;
   window.dispatchEvent(new Event('sb-ready'));
 </script>
@@ -377,17 +379,27 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
       <div class="login-title">FlowDesk</div>
       <div class="login-sub">Project Management Suite</div>
     </div>
-    <div class="login-error" id="loginError">Invalid username or password.</div>
+    <div class="login-error" id="loginError">Invalid email or password.</div>
+    <div style="display:flex;gap:6px;margin-bottom:14px;">
+      <button id="tabSignIn" type="button" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center;" onclick="switchAuthTab('signin')">Sign In</button>
+      <button id="tabSignUp" type="button" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center;" onclick="switchAuthTab('signup')">Sign Up</button>
+    </div>
+    <div id="signupOnly" style="display:none;">
+      <div class="form-group">
+        <label>Display Name</label>
+        <input type="text" id="signupName" placeholder="Your name" autocomplete="name">
+      </div>
+    </div>
     <div class="form-group">
-      <label>Username</label>
-      <input type="text" id="loginUser" placeholder="Enter username" autocomplete="off">
+      <label>Email</label>
+      <input type="email" id="loginUser" placeholder="you@example.com" autocomplete="email">
     </div>
     <div class="form-group">
       <label>Password</label>
-      <input type="password" id="loginPass" placeholder="Enter password">
+      <input type="password" id="loginPass" placeholder="Enter password" autocomplete="current-password">
     </div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px;" onclick="doLogin()">Sign In</button>
-    <div style="margin-top:16px;font-size:12px;color:var(--text3);text-align:center;">Sign in with your FlowDesk account.</div>
+    <button id="authPrimaryBtn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px;" onclick="doAuthSubmit()">Sign In</button>
+    <div id="authHint" style="margin-top:16px;font-size:12px;color:var(--text3);text-align:center;">Sign in with your FlowDesk account. The first user to sign up becomes the admin.</div>
   </div>
 </div>
 
@@ -738,9 +750,8 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
         <label>Email</label>
         <input type="email" id="userEmail">
       </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input type="password" id="userPassword" placeholder="Leave blank to keep existing">
+      <div class="form-group" style="display:none;">
+        <input type="password" id="userPassword">
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -822,14 +833,23 @@ const Cloud = {
   },
   async loadAll() {
     const sb = await this.waitForClient();
-    const [u, w, i, a, s] = await Promise.all([
-      sb.from('app_users').select('*').order('created_at'),
+    const [p, r, w, i, a, s] = await Promise.all([
+      sb.from('profiles').select('*').order('created_at'),
+      sb.from('user_roles').select('user_id,role'),
       sb.from('workstreams').select('*').order('created_at'),
       sb.from('issues').select('*').order('created_at'),
       sb.from('activities').select('*').order('created_at', { ascending: false }).limit(200),
       sb.from('settings_kv').select('*'),
     ]);
-    if (u.data) DB.users = u.data.map(this.mapUserFromDB);
+    const roleByUser = {};
+    if (r.data) for (const row of r.data) {
+      // Pick the highest-privilege role if multiple exist
+      const rank = { admin:1, pm:2, dev:3, viewer:4 };
+      if (!roleByUser[row.user_id] || rank[row.role] < rank[roleByUser[row.user_id]]) {
+        roleByUser[row.user_id] = row.role;
+      }
+    }
+    if (p.data) DB.users = p.data.map(row => Cloud.mapProfileFromDB(row, roleByUser[row.id] || 'viewer'));
     if (w.data) DB.workstreams = w.data.map(this.mapWsFromDB);
     if (i.data) DB.issues = i.data.map(this.mapIssueFromDB);
     if (a.data) DB.activity = a.data.map(this.mapActivityFromDB).reverse();
@@ -845,8 +865,8 @@ const Cloud = {
     if (map.roles_perm)                DB.permissions = this.mapPermissionsFromDB(map.roles_perm);
     if (map.dashboard_segments)        DB.dashboardSegments = map.dashboard_segments;
   },
-  mapUserFromDB(r) {
-    return { id: r.id, name: r.name, username: r.username, password: r.password, email: r.email||'', role: r.role, dept: r.dept||'', responsibilities: r.responsibilities||'', avatarColor: r.avatar_color };
+  mapProfileFromDB(r, role) {
+    return { id: r.id, name: r.name||'', username: r.username||'', email: r.email||'', role: role||'viewer', dept: r.dept||'', responsibilities: r.responsibilities||'', avatarColor: r.avatar_color };
   },
   mapWsFromDB(r) { return { id: r.id, name: r.name, dept: r.dept||'', desc: r.description||'', color: r.color||'#6c63ff' }; },
   mapIssueFromDB(r) {
@@ -918,20 +938,28 @@ const Cloud = {
     const { error } = await sb.from('workstreams').delete().eq('id', id);
     if (error) { console.error('deleteWorkstream', error); toast('Delete failed','error'); }
   },
-  // ----- Users -----
-  async upsertUser(u) {
+  // ----- Profiles + Roles -----
+  async upsertProfile(u) {
     const sb = await this.waitForClient();
-    const row = { id: u.id, name: u.name, username: u.username, email: u.email||null,
-      role: u.role, dept: u.dept||null };
-    if (u.password) row.password = u.password;
-    const { data, error } = await sb.from('app_users').upsert(row).select().single();
-    if (error) { console.error('upsertUser', error); toast('Save failed: ' + error.message,'error'); return null; }
-    return Cloud.mapUserFromDB(data);
+    if (!u.id) { toast('Cannot create users from this form. Ask the user to sign up.','error'); return null; }
+    const row = { id: u.id, name: u.name, username: u.username||null, email: u.email||null,
+      dept: u.dept||null, responsibilities: u.responsibilities||null };
+    const { data, error } = await sb.from('profiles').update(row).eq('id', u.id).select().single();
+    if (error) { console.error('upsertProfile', error); toast('Save failed: ' + error.message,'error'); return null; }
+    if (u.role) {
+      // Replace role(s) for this user with the chosen role (admin only — RLS enforced)
+      await sb.from('user_roles').delete().eq('user_id', u.id);
+      const { error: re } = await sb.from('user_roles').insert({ user_id: u.id, role: u.role });
+      if (re) { console.error('setRole', re); toast('Role update failed: ' + re.message, 'error'); }
+    }
+    return Cloud.mapProfileFromDB(data, u.role || 'viewer');
   },
-  async deleteUser(id) {
+  async deleteProfile(id) {
     const sb = await this.waitForClient();
-    const { error } = await sb.from('app_users').delete().eq('id', id);
-    if (error) { console.error('deleteUser', error); toast('Delete failed','error'); }
+    // Note: this only deletes the profile row, not the auth.users entry.
+    // Fully removing a user requires an admin edge function with the service role key.
+    const { error } = await sb.from('profiles').delete().eq('id', id);
+    if (error) { console.error('deleteProfile', error); toast('Delete failed: ' + error.message,'error'); }
   },
   // ----- Activity -----
   async logActivity(text) {
@@ -957,7 +985,8 @@ const Cloud = {
     const ch = window.sb.channel('flowdesk-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'issues' },      () => onChange('issues'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'workstreams' }, () => onChange('workstreams'))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_users' },   () => onChange('users'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' },    () => onChange('users'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_roles' },  () => onChange('users'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' },  () => onChange('activities'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings_kv' }, () => onChange('settings'))
       .subscribe();
@@ -980,8 +1009,23 @@ async function cloudHandleChange(kind) {
     const { data } = await sb.from('workstreams').select('*').order('created_at');
     if (data) DB.workstreams = data.map(Cloud.mapWsFromDB);
   } else if (kind === 'users') {
-    const { data } = await sb.from('app_users').select('*').order('created_at');
-    if (data) DB.users = data.map(Cloud.mapUserFromDB);
+    const [p, r] = await Promise.all([
+      sb.from('profiles').select('*').order('created_at'),
+      sb.from('user_roles').select('user_id,role'),
+    ]);
+    const roleByUser = {};
+    if (r.data) {
+      const rank = { admin:1, pm:2, dev:3, viewer:4 };
+      for (const row of r.data) {
+        if (!roleByUser[row.user_id] || rank[row.role] < rank[roleByUser[row.user_id]]) roleByUser[row.user_id] = row.role;
+      }
+    }
+    if (p.data) DB.users = p.data.map(row => Cloud.mapProfileFromDB(row, roleByUser[row.id] || 'viewer'));
+    // Refresh currentUser role/profile too in case it changed
+    if (currentUser) {
+      const me = DB.users.find(x => x.id === currentUser.id);
+      if (me) currentUser = { ...currentUser, ...me };
+    }
   } else if (kind === 'activities') {
     const { data } = await sb.from('activities').select('*').order('created_at',{ascending:false}).limit(200);
     if (data) DB.activity = data.map(Cloud.mapActivityFromDB).reverse();
@@ -1084,37 +1128,68 @@ function fmtDate(d) {
   return d.toISOString().split('T')[0];
 }
 
-// ====== AUTH ======
-async function doLogin() {
-  const u = document.getElementById('loginUser').value.trim();
-  const p = document.getElementById('loginPass').value.trim();
-  if (!u || !p) { document.getElementById('loginError').textContent = 'Enter username and password.'; document.getElementById('loginError').style.display='block'; return; }
-  try {
-    const sb = await Cloud.waitForClient();
-    const { data, error } = await sb.from('app_users').select('*').eq('username', u).maybeSingle();
-    if (error) throw error;
-    if (!data || data.password !== p) {
-      document.getElementById('loginError').textContent = 'Invalid username or password.';
-      document.getElementById('loginError').style.display = 'block';
-      return;
-    }
-    currentUser = Cloud.mapUserFromDB(data);
-  } catch (err) {
-    console.error('login', err);
-    document.getElementById('loginError').textContent = 'Login failed: ' + (err.message||'unknown error');
-    document.getElementById('loginError').style.display = 'block';
-    return;
+// ====== AUTH (Supabase Auth) ======
+let authMode = 'signin'; // 'signin' | 'signup'
+function switchAuthTab(mode) {
+  authMode = mode;
+  const su = document.getElementById('signupOnly');
+  const btn = document.getElementById('authPrimaryBtn');
+  const hint = document.getElementById('authHint');
+  const tIn = document.getElementById('tabSignIn');
+  const tUp = document.getElementById('tabSignUp');
+  const err = document.getElementById('loginError');
+  if (err) err.style.display = 'none';
+  if (mode === 'signup') {
+    if (su) su.style.display = 'block';
+    if (btn) btn.textContent = 'Create Account';
+    if (hint) hint.textContent = 'The very first user to sign up automatically becomes the admin. All others start as viewers until promoted.';
+    if (tIn) tIn.classList.remove('btn-primary');
+    if (tUp) tUp.classList.add('btn-primary');
+    document.getElementById('loginPass').setAttribute('autocomplete','new-password');
+  } else {
+    if (su) su.style.display = 'none';
+    if (btn) btn.textContent = 'Sign In';
+    if (hint) hint.textContent = 'Sign in with your FlowDesk account.';
+    if (tUp) tUp.classList.remove('btn-primary');
+    if (tIn) tIn.classList.add('btn-primary');
+    document.getElementById('loginPass').setAttribute('autocomplete','current-password');
   }
-  document.getElementById('loginPage').style.display = 'none';
-  document.getElementById('app').classList.remove('hidden');
-  document.getElementById('app').style.display = 'flex';
-  document.body.classList.remove('login-mode');
-  document.getElementById('sidebarUsername').textContent = currentUser.name;
-  document.getElementById('sidebarRole').textContent = (currentUser.role||'').toUpperCase();
-  document.getElementById('sidebarAvatar').textContent = currentUser.name[0];
-  await initApp();
 }
-function doLogout() {
+
+async function doAuthSubmit() {
+  const err = document.getElementById('loginError');
+  err.style.display = 'none';
+  const email = document.getElementById('loginUser').value.trim();
+  const pass  = document.getElementById('loginPass').value;
+  if (!email || !pass) { err.textContent = 'Enter email and password.'; err.style.display='block'; return; }
+  const sb = await Cloud.waitForClient();
+  try {
+    if (authMode === 'signup') {
+      const name = (document.getElementById('signupName').value||'').trim() || email.split('@')[0];
+      const redirectTo = `${window.location.origin}${window.location.pathname}`;
+      const { error } = await sb.auth.signUp({
+        email, password: pass,
+        options: { emailRedirectTo: redirectTo, data: { name, username: email.split('@')[0] } }
+      });
+      if (error) throw error;
+      // Auto-confirm is enabled, so the user is signed in immediately. onAuthStateChange will hydrate.
+      toast('Account created. Welcome!', 'success');
+    } else {
+      const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+      if (error) throw error;
+    }
+  } catch (e) {
+    console.error('auth', e);
+    err.textContent = e.message || 'Authentication failed.';
+    err.style.display = 'block';
+  }
+}
+
+// Backwards-compat alias for any leftover onclick handlers.
+function doLogin() { return doAuthSubmit(); }
+
+async function doLogout() {
+  try { const sb = await Cloud.waitForClient(); await sb.auth.signOut(); } catch(_){}
   Cloud.unsubscribe();
   currentUser = null;
   document.getElementById('loginPage').style.display = 'flex';
@@ -1122,8 +1197,73 @@ function doLogout() {
   document.body.classList.add('login-mode');
   document.getElementById('loginUser').value = '';
   document.getElementById('loginPass').value = '';
+  const sn = document.getElementById('signupName'); if (sn) sn.value = '';
   document.getElementById('loginError').style.display = 'none';
+  switchAuthTab('signin');
 }
+
+// Hydrate currentUser from a Supabase session.
+// Returns true on success, false if profile not yet available.
+async function hydrateSessionUser(session) {
+  if (!session?.user) return false;
+  const sb = await Cloud.waitForClient();
+  const { data: prof } = await sb.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+  const { data: roles } = await sb.from('user_roles').select('role').eq('user_id', session.user.id);
+  let role = 'viewer';
+  if (roles && roles.length) {
+    const rank = { admin:1, pm:2, dev:3, viewer:4 };
+    role = roles.map(r => r.role).sort((a,b) => rank[a]-rank[b])[0];
+  }
+  currentUser = {
+    id: session.user.id,
+    name: prof?.name || session.user.email?.split('@')[0] || 'User',
+    username: prof?.username || '',
+    email: session.user.email || prof?.email || '',
+    role,
+    dept: prof?.dept || '',
+    responsibilities: prof?.responsibilities || '',
+    avatarColor: prof?.avatar_color || null,
+  };
+  return true;
+}
+
+async function enterAppForCurrentUser() {
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('app').style.display = 'flex';
+  document.body.classList.remove('login-mode');
+  document.getElementById('sidebarUsername').textContent = currentUser.name;
+  document.getElementById('sidebarRole').textContent = (currentUser.role||'').toUpperCase();
+  document.getElementById('sidebarAvatar').textContent = (currentUser.name||'?')[0];
+  await initApp();
+}
+
+// Session bootstrap: handle sign-in / sign-out events from Supabase.
+(async function bootstrapAuth() {
+  const sb = await Cloud.waitForClient();
+  // Listener FIRST (per Supabase guidance), then read current session.
+  sb.auth.onAuthStateChange(async (_event, session) => {
+    if (session?.user) {
+      // Profile may take a moment for the on-signup trigger to run; retry briefly.
+      let ok = await hydrateSessionUser(session);
+      let tries = 0;
+      while (!ok && tries < 5) { await new Promise(r=>setTimeout(r, 250)); ok = await hydrateSessionUser(session); tries++; }
+      if (ok) await enterAppForCurrentUser();
+    } else if (currentUser) {
+      // Signed out elsewhere — drop UI state.
+      currentUser = null;
+      Cloud.unsubscribe();
+      document.getElementById('loginPage').style.display = 'flex';
+      document.getElementById('app').style.display = 'none';
+      document.body.classList.add('login-mode');
+    }
+  });
+  const { data } = await sb.auth.getSession();
+  if (data?.session?.user) {
+    const ok = await hydrateSessionUser(data.session);
+    if (ok) await enterAppForCurrentUser();
+  }
+})();
 
 // ====== NAVIGATION ======
 function nav(page, el) {
@@ -1865,18 +2005,16 @@ function saveUser() {
     name, username, email: document.getElementById('userEmail').value, role: document.getElementById('userRole').value,
     dept: document.getElementById('userDept').value, responsibilities: document.getElementById('userResponsibilities').value
   };
-  const pw = document.getElementById('userPassword').value;
-  if (pw) data.password = pw;
   if (editingUserId) {
     const idx = DB.users.findIndex(u=>u.id===editingUserId);
     const merged = { ...DB.users[idx], ...data };
     DB.users[idx] = merged;
-    Cloud.upsertUser(merged).then(saved => { if (saved) { const i = DB.users.findIndex(x=>x.id===saved.id); if (i>=0) DB.users[i]=saved; renderUsers(); populateFilters(); }});
+    Cloud.upsertProfile(merged).then(saved => { if (saved) { const i = DB.users.findIndex(x=>x.id===saved.id); if (i>=0) DB.users[i]={...DB.users[i], ...saved, role: merged.role}; renderUsers(); populateFilters(); }});
     toast('User updated','success');
   } else {
-    if (!pw) { toast('Password required for new user','error'); return; }
-    Cloud.upsertUser({ password: pw, ...data }).then(saved => { if (saved) { DB.users.push(saved); renderUsers(); populateFilters(); }});
-    toast('User created','success');
+    toast('New users must sign up themselves on the login page. Share the app URL with them.', 'info');
+    closeModal('userModal');
+    return;
   }
   closeModal('userModal'); renderUsers(); populateFilters();
 }
@@ -1884,7 +2022,7 @@ function saveUser() {
 function deleteUser(id) {
   if (!confirm('Delete this user?')) return;
   DB.users = DB.users.filter(u=>u.id!==id);
-  Cloud.deleteUser(id);
+  Cloud.deleteProfile(id);
   renderUsers(); toast('User deleted','info');
 }
 
@@ -2046,15 +2184,16 @@ function toast(msg, type='info') {
 document.addEventListener('keydown', e => { if (e.key==='Escape') document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(m=>m.classList.add('hidden')); });
 document.addEventListener('keydown', e => { if (e.key==='n' && e.ctrlKey) { e.preventDefault(); openNewIssue(); } });
 
-// Enter-key submits login form
+// Enter-key submits login form + initial tab styling
 document.addEventListener('DOMContentLoaded', () => {
-  ['loginUser','loginPass'].forEach(id => {
+  ['loginUser','loginPass','signupName'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); doLogin(); }
+      if (e.key === 'Enter') { e.preventDefault(); doAuthSubmit(); }
     });
   });
+  if (typeof switchAuthTab === 'function') switchAuthTab('signin');
 });
 
 // ====== FOCUS PAGE (my assigned items) ======
