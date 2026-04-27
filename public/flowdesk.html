@@ -2006,18 +2006,16 @@ function saveUser() {
     name, username, email: document.getElementById('userEmail').value, role: document.getElementById('userRole').value,
     dept: document.getElementById('userDept').value, responsibilities: document.getElementById('userResponsibilities').value
   };
-  const pw = document.getElementById('userPassword').value;
-  if (pw) data.password = pw;
   if (editingUserId) {
     const idx = DB.users.findIndex(u=>u.id===editingUserId);
     const merged = { ...DB.users[idx], ...data };
     DB.users[idx] = merged;
-    Cloud.upsertUser(merged).then(saved => { if (saved) { const i = DB.users.findIndex(x=>x.id===saved.id); if (i>=0) DB.users[i]=saved; renderUsers(); populateFilters(); }});
+    Cloud.upsertProfile(merged).then(saved => { if (saved) { const i = DB.users.findIndex(x=>x.id===saved.id); if (i>=0) DB.users[i]={...DB.users[i], ...saved, role: merged.role}; renderUsers(); populateFilters(); }});
     toast('User updated','success');
   } else {
-    if (!pw) { toast('Password required for new user','error'); return; }
-    Cloud.upsertUser({ password: pw, ...data }).then(saved => { if (saved) { DB.users.push(saved); renderUsers(); populateFilters(); }});
-    toast('User created','success');
+    toast('New users must sign up themselves on the login page. Share the app URL with them.', 'info');
+    closeModal('userModal');
+    return;
   }
   closeModal('userModal'); renderUsers(); populateFilters();
 }
@@ -2025,7 +2023,7 @@ function saveUser() {
 function deleteUser(id) {
   if (!confirm('Delete this user?')) return;
   DB.users = DB.users.filter(u=>u.id!==id);
-  Cloud.deleteUser(id);
+  Cloud.deleteProfile(id);
   renderUsers(); toast('User deleted','info');
 }
 
