@@ -1393,17 +1393,17 @@ function renderIssues() {
   tbody.innerHTML = issues.map(i => {
     const canEdit = canEditIssue(i);
     const canDelete = currentUser?.role === 'admin';
-    const labels = (i.labels||[]).map(l => { const lb = DB.labels.find(x=>x.name===l); return `<span class="badge" style="background:${(lb?.color||'#6c63ff')}22;color:${lb?.color||'#6c63ff'};margin:1px;">${l}</span>`; }).join('');
+    const labels = (i.labels||[]).map(l => { const lb = DB.labels.find(x=>x.name===l); return `<span class="badge" style="background:${(lb?.color||'#6c63ff')}22;color:${lb?.color||'#6c63ff'};margin:1px;">${escapeHtml(l)}</span>`; }).join('');
     return `<tr onclick="${canEdit ? `openEditIssue('${i.id}')` : ''}">
-      <td class="mono" style="color:var(--text3);font-size:11px;">#${i.id}</td>
-      <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;">${i.title}</td>
-      <td><span class="badge badge-${i.type.toLowerCase()}">${i.type}</span></td>
-      <td><span class="badge badge-${statusKey(i.status)}">${i.status}</span></td>
-      <td><span class="prio-dot prio-${i.priority.toLowerCase()}" style="margin-right:4px;"></span>${i.priority}</td>
-      <td>${i.assignee||'—'}</td>
-      <td>${i.workstream||'—'}</td>
-      <td class="mono" style="font-size:12px;color:var(--text2);">${i.start||'—'}</td>
-      <td class="mono" style="font-size:12px;color:var(--text2);">${i.end||'—'}</td>
+      <td class="mono" style="color:var(--text3);font-size:11px;">#${escapeHtml(i.id)}</td>
+      <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;">${escapeHtml(i.title)}</td>
+      <td><span class="badge badge-${(i.type||'').toLowerCase()}">${escapeHtml(i.type||'')}</span></td>
+      <td><span class="badge badge-${statusKey(i.status)}">${escapeHtml(i.status||'')}</span></td>
+      <td><span class="prio-dot prio-${(i.priority||'').toLowerCase()}" style="margin-right:4px;"></span>${escapeHtml(i.priority||'')}</td>
+      <td>${escapeHtml(i.assignee||'—')}</td>
+      <td>${escapeHtml(i.workstream||'—')}</td>
+      <td class="mono" style="font-size:12px;color:var(--text2);">${escapeHtml(i.start||'—')}</td>
+      <td class="mono" style="font-size:12px;color:var(--text2);">${escapeHtml(i.end||'—')}</td>
       <td>${labels||'—'}</td>
       <td onclick="event.stopPropagation()">
         <div style="display:flex;gap:4px;">
@@ -1585,12 +1585,12 @@ function kanbanCard(i, canDrag) {
   const prioColors = { Critical:'var(--critical)', High:'var(--high)', Medium:'var(--medium)', Low:'var(--low)' };
   const editable = canEditIssue(i);
   return `<div class="kanban-card" ${canDrag?'draggable="true"':''} ${canDrag?`ondragstart="dragStart(event,'${i.id}')" ondragend="dragEnd(event)"`:''} ${editable?`onclick="openEditIssue('${i.id}')"`:''} style="${!canDrag?'cursor:default;':''}">
-    <div class="kanban-card-title">${i.title}</div>
+    <div class="kanban-card-title">${escapeHtml(i.title)}</div>
     <div class="kanban-card-meta">
-      <span class="badge badge-${i.type.toLowerCase()}" style="font-size:10px;">${i.type}</span>
-      <span class="prio-dot prio-${i.priority.toLowerCase()}" title="${i.priority}" style="background:${prioColors[i.priority]}"></span>
-      <span class="kanban-card-id">#${i.id}</span>
-      ${i.assignee ? `<span style="margin-left:auto;font-size:10px;color:var(--text3);">${i.assignee.split(' ')[0]}</span>` : ''}
+      <span class="badge badge-${(i.type||'').toLowerCase()}" style="font-size:10px;">${escapeHtml(i.type||'')}</span>
+      <span class="prio-dot prio-${(i.priority||'').toLowerCase()}" title="${escapeHtml(i.priority||'')}" style="background:${prioColors[i.priority]}"></span>
+      <span class="kanban-card-id">#${escapeHtml(i.id)}</span>
+      ${i.assignee ? `<span style="margin-left:auto;font-size:10px;color:var(--text3);">${escapeHtml(i.assignee.split(' ')[0])}</span>` : ''}
     </div>
     ${i.checklist?.length ? `<div style="font-size:10px;color:var(--text3);margin-top:6px;font-family:var(--mono);">${i.checklist.filter(c=>c.done).length}/${i.checklist.length} done</div>` : ''}
   </div>`;
@@ -1643,11 +1643,11 @@ function renderGantt() {
     const color = barColors[idx % barColors.length];
     const done = issue.checklist?.length ? Math.round(issue.checklist.filter(c=>c.done).length/issue.checklist.length*100) : 0;
     html += `<div class="gantt-row">
-      <div class="gantt-row-label"><span class="prio-dot prio-${issue.priority.toLowerCase()}" style="flex-shrink:0;"></span>${issue.title}</div>
+      <div class="gantt-row-label"><span class="prio-dot prio-${(issue.priority||'').toLowerCase()}" style="flex-shrink:0;"></span>${escapeHtml(issue.title)}</div>
       <div class="gantt-track">
         <div class="gantt-bar" style="left:${left}%;width:${width}%;background:${color}cc;border:1.5px solid ${color};"
-          onmouseenter="showGanttTooltip(event,${issue.id})" onmouseleave="hideGanttTooltip()">
-          ${parseFloat(width)>6 ? issue.title : ''}
+          onmouseenter="showGanttTooltip(event,'${issue.id}')" onmouseleave="hideGanttTooltip()">
+          ${parseFloat(width)>6 ? escapeHtml(issue.title) : ''}
         </div>
       </div>
     </div>`;
@@ -1661,12 +1661,12 @@ function showGanttTooltip(e, id) {
   if (!issue) return;
   const tt = document.getElementById('ganttTooltip');
   const done = issue.checklist?.length ? `${issue.checklist.filter(c=>c.done).length}/${issue.checklist.length} tasks` : 'No tasks';
-  tt.innerHTML = `<div class="gantt-tooltip-title">${issue.title}</div>
-    <div class="gantt-tooltip-row">📌 ${issue.type} · ${issue.priority}</div>
-    <div class="gantt-tooltip-row">📋 ${issue.status}</div>
-    <div class="gantt-tooltip-row">👤 ${issue.assignee||'Unassigned'}</div>
-    <div class="gantt-tooltip-row">📅 ${issue.start} → ${issue.end}</div>
-    <div class="gantt-tooltip-row">✅ ${done}</div>`;
+  tt.innerHTML = `<div class="gantt-tooltip-title">${escapeHtml(issue.title)}</div>
+    <div class="gantt-tooltip-row">📌 ${escapeHtml(issue.type||'')} · ${escapeHtml(issue.priority||'')}</div>
+    <div class="gantt-tooltip-row">📋 ${escapeHtml(issue.status||'')}</div>
+    <div class="gantt-tooltip-row">👤 ${escapeHtml(issue.assignee||'Unassigned')}</div>
+    <div class="gantt-tooltip-row">📅 ${escapeHtml(issue.start||'')} → ${escapeHtml(issue.end||'')}</div>
+    <div class="gantt-tooltip-row">✅ ${escapeHtml(done)}</div>`;
   tt.style.left = (e.clientX+14)+'px';
   tt.style.top = (e.clientY-10)+'px';
   tt.classList.add('visible');
@@ -1689,15 +1689,15 @@ function renderWorkstreams() {
     return `<div class="ws-card">
       <div class="ws-header">
         <div>
-          <div class="ws-name">${w.name}</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:2px;font-family:var(--mono);">${w.dept}</div>
+          <div class="ws-name">${escapeHtml(w.name)}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px;font-family:var(--mono);">${escapeHtml(w.dept||'')}</div>
         </div>
         <div style="display:flex;gap:6px;">
           ${can('interact','workstreams') ? `<button class="btn btn-ghost btn-sm" onclick="openWorkstreamModal('${w.id}')">Edit</button>` : ''}
           ${currentUser?.role==='admin'   ? `<button class="btn btn-danger btn-sm" onclick="deleteWorkstream('${w.id}')">Delete</button>` : ''}
         </div>
       </div>
-      <div style="font-size:13px;color:var(--text2);">${w.desc}</div>
+      <div style="font-size:13px;color:var(--text2);">${escapeHtml(w.desc||'')}</div>
       <div style="display:flex;gap:24px;margin-top:12px;">
         <div><span style="font-size:20px;font-weight:600;font-family:var(--mono);color:${w.color}">${issues.length}</span><div style="font-size:11px;color:var(--text3);font-family:var(--mono);">ISSUES</div></div>
         <div><span style="font-size:20px;font-weight:600;font-family:var(--mono);color:var(--green)">${done}</span><div style="font-size:11px;color:var(--text3);font-family:var(--mono);">DONE</div></div>
@@ -1774,7 +1774,7 @@ function renderSettings() {
 
 function renderTypeList() {
   document.getElementById('typeList').innerHTML = DB.types.map((t,i) =>
-    `<span class="tag-item"><span style="width:10px;height:10px;background:${t.color};border-radius:50%;display:inline-block;margin-right:4px;"></span>${t.name}
+    `<span class="tag-item"><span style="width:10px;height:10px;background:${t.color};border-radius:50%;display:inline-block;margin-right:4px;"></span>${escapeHtml(t.name)}
     <button class="tag-remove" onclick="removeType(${i})">✕</button></span>`).join('');
 }
 function addType() {
@@ -1787,12 +1787,12 @@ function removeType(i) { DB.types.splice(i,1); renderTypeList(); }
 function renderPriorityList() {
   const colors = { Critical:'var(--critical)', High:'var(--high)', Medium:'var(--medium)', Low:'var(--low)' };
   document.getElementById('priorityList').innerHTML = DB.priorities.map(p =>
-    `<span class="tag-item"><span class="prio-dot prio-${p.toLowerCase()}" style="background:${colors[p]||'#999'}"></span>${p}</span>`).join('');
+    `<span class="tag-item"><span class="prio-dot prio-${p.toLowerCase()}" style="background:${colors[p]||'#999'}"></span>${escapeHtml(p)}</span>`).join('');
 }
 
 function renderLabelList() {
   document.getElementById('labelList').innerHTML = DB.labels.map((l,i) =>
-    `<span class="tag-item"><span style="width:10px;height:10px;background:${l.color};border-radius:50%;display:inline-block;margin-right:4px;"></span>${l.name}
+    `<span class="tag-item"><span style="width:10px;height:10px;background:${l.color};border-radius:50%;display:inline-block;margin-right:4px;"></span>${escapeHtml(l.name)}
     <button class="tag-remove" onclick="removeLabel(${i})">✕</button></span>`).join('');
 }
 function addLabel() {
@@ -1804,7 +1804,7 @@ function removeLabel(i) { DB.labels.splice(i,1); renderLabelList(); }
 
 function renderStatusList() {
   document.getElementById('statusList').innerHTML = DB.statuses.map((s,i) =>
-    `<span class="tag-item"><span style="width:10px;height:10px;background:${s.color};border-radius:50%;display:inline-block;margin-right:4px;"></span>${s.name}
+    `<span class="tag-item"><span style="width:10px;height:10px;background:${s.color};border-radius:50%;display:inline-block;margin-right:4px;"></span>${escapeHtml(s.name)}
     <button class="tag-remove" onclick="removeStatus(${i})">✕</button></span>`).join('');
 }
 function addStatus() {
@@ -1822,11 +1822,11 @@ function renderUsers() {
   const addBtn = document.getElementById('addUserBtn');
   if (addBtn) addBtn.style.display = (currentUser?.role === 'admin') ? '' : 'none';
   tbody.innerHTML = DB.users.map(u => `<tr>
-    <td><div style="display:flex;align-items:center;gap:8px;"><div class="avatar" style="width:28px;height:28px;font-size:11px;background:var(--accent);">${u.name[0]}</div>${u.name}</div></td>
-    <td class="mono" style="font-size:12px;">${u.username}</td>
-    <td style="color:var(--text2);font-size:12px;">${u.email||'—'}</td>
-    <td><span class="role-badge role-${u.role}">${u.role}</span></td>
-    <td style="font-size:12px;color:var(--text2);">${u.dept||'—'}</td>
+    <td><div style="display:flex;align-items:center;gap:8px;"><div class="avatar" style="width:28px;height:28px;font-size:11px;background:var(--accent);">${escapeHtml((u.name||'?')[0])}</div>${escapeHtml(u.name||'')}</div></td>
+    <td class="mono" style="font-size:12px;">${escapeHtml(u.username||'')}</td>
+    <td style="color:var(--text2);font-size:12px;">${escapeHtml(u.email||'—')}</td>
+    <td><span class="role-badge role-${escapeHtml(u.role||'')}">${escapeHtml(u.role||'')}</span></td>
+    <td style="font-size:12px;color:var(--text2);">${escapeHtml(u.dept||'—')}</td>
     <td><div style="display:flex;gap:4px;">
       ${currentUser?.role==='admin' ? `<button class="btn btn-ghost btn-sm" onclick="openUserModal('${u.id}')">Edit</button>` : ''}
       ${currentUser?.role==='admin' && u.id!==currentUser.id ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">Delete</button>` : ''}
