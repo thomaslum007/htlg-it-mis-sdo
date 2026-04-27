@@ -228,6 +228,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      list_profiles_public: {
+        Args: never
+        Returns: {
+          avatar_color: string
+          created_at: string
+          dept: string
+          id: string
+          name: string
+          username: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "pm" | "dev" | "viewer"
