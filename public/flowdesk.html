@@ -1711,7 +1711,7 @@ function openEditIssue(id) {
   if (!issue) return;
   if (!canEditIssue(issue)) { toast('You can only edit issues you created.', 'error'); return; }
   editingIssueId = id;
-  document.getElementById('issueModalTitle').textContent = 'Edit Issue #' + id;
+  document.getElementById('issueModalTitle').textContent = 'Edit Issue ' + (issue.key || '#' + id);
   document.getElementById('issueId').value = id;
   populateIssueDropdowns();
   document.getElementById('issueTitle').value = issue.title;
