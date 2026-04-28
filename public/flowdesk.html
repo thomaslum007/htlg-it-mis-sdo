@@ -870,7 +870,7 @@ const Cloud = {
   },
   mapWsFromDB(r) { return { id: r.id, name: r.name, dept: r.dept||'', desc: r.description||'', color: r.color||'#6c63ff' }; },
   mapIssueFromDB(r) {
-    return { id: r.id, title: r.title, type: r.type, status: r.status, priority: r.priority,
+    return { id: r.id, key: r.key||'', title: r.title, type: r.type, status: r.status, priority: r.priority,
       assignee: r.assignee||'', workstream: r.workstream||'', labels: r.labels||[],
       start: r.start_date||'', end: r.end_date||'', desc: r.description||'',
       checklist: r.checklist||[], createdBy: r.created_by, createdByName: r.created_by_name, created: r.created_at };
@@ -916,6 +916,8 @@ const Cloud = {
       description: issue.desc||'', created_by: issue.createdBy||null,
       created_by_name: issue.createdByName||null,
     };
+    // Only send `key` on update (when row exists). Let DB trigger assign on new inserts.
+    if (issue.key) row.key = issue.key;
     const { data, error } = await sb.from('issues').upsert(row).select().single();
     if (error) { console.error('upsertIssue', error); toast('Save failed: ' + error.message,'error'); return null; }
     return Cloud.mapIssueFromDB(data);
