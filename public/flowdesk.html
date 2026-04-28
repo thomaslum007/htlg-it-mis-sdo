@@ -1158,11 +1158,24 @@ function switchAuthTab(mode) {
 
 async function doAuthSubmit() {
   const err = document.getElementById('loginError');
-  err.style.display = 'none';
+  const btn = document.getElementById('authPrimaryBtn');
+  const showMsg = (msg, isError = true) => {
+    if (!err) { alert(msg); return; }
+    err.textContent = msg;
+    err.style.display = 'block';
+    err.style.background = isError ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.12)';
+    err.style.borderColor = isError ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.35)';
+    err.style.color = isError ? '#f87171' : '#4ade80';
+  };
+  console.log('[auth] submit clicked, mode=', authMode);
+  showMsg(authMode === 'signup' ? 'Creating account…' : 'Signing in…', false);
   const email = document.getElementById('loginUser').value.trim();
   const pass  = document.getElementById('loginPass').value;
-  if (!email || !pass) { err.textContent = 'Enter email and password.'; err.style.display='block'; return; }
-  const sb = await Cloud.waitForClient();
+  if (!email || !pass) { showMsg('Enter email and password.'); return; }
+  if (btn) { btn.disabled = true; btn.dataset._label = btn.textContent; btn.textContent = 'Please wait…'; }
+  let sb;
+  try { sb = await Cloud.waitForClient(); }
+  catch (e) { showMsg('Could not reach the server. Check your connection.'); if (btn){btn.disabled=false; btn.textContent=btn.dataset._label||'Sign In';} return; }
   try {
     if (authMode === 'signup') {
       const name = (document.getElementById('signupName').value||'').trim() || email.split('@')[0];
@@ -1173,15 +1186,24 @@ async function doAuthSubmit() {
       });
       if (error) throw error;
       // Auto-confirm is enabled, so the user is signed in immediately. onAuthStateChange will hydrate.
+      showMsg('Account created. Signing you in…', false);
       toast('Account created. Welcome!', 'success');
     } else {
       const { error } = await sb.auth.signInWithPassword({ email, password: pass });
       if (error) throw error;
+      showMsg('Signed in. Loading your workspace…', false);
     }
   } catch (e) {
-    console.error('auth', e);
-    err.textContent = e.message || 'Authentication failed.';
-    err.style.display = 'block';
+    console.error('[auth] error', e);
+    const raw = (e && (e.message || e.error_description)) || 'Authentication failed.';
+    let friendly = raw;
+    if (/invalid login credentials/i.test(raw)) friendly = 'Wrong email or password. If you do not have an account yet, switch to Sign Up.';
+    else if (/already registered|already exists|user already/i.test(raw)) friendly = 'An account with this email already exists. Switch to Sign In.';
+    else if (/email.*confirm/i.test(raw)) friendly = 'Please confirm your email, then try again.';
+    else if (/failed to fetch|network/i.test(raw)) friendly = 'Network error reaching the server. Try again.';
+    showMsg(friendly);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = btn.dataset._label || (authMode === 'signup' ? 'Create Account' : 'Sign In'); }
   }
 }
 
