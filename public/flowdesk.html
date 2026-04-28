@@ -1210,18 +1210,61 @@ async function doAuthSubmit() {
 // Backwards-compat alias for any leftover onclick handlers.
 function doLogin() { return doAuthSubmit(); }
 
+// ===== Auth storage cleanup =====
+// Wipes every Supabase auth token across localStorage/sessionStorage and
+// clears any sb-* cookies. Safe to call multiple times.
+function clearAuthStorage() {
+  try {
+    const wipe = (store) => {
+      if (!store) return;
+      const keys = [];
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i);
+        if (k && (k.startsWith('sb-') || k.includes('supabase.auth') || k.includes('-auth-token'))) {
+          keys.push(k);
+        }
+      }
+      keys.forEach(k => { try { store.removeItem(k); } catch(_){} });
+    };
+    wipe(window.localStorage);
+    wipe(window.sessionStorage);
+    // Clear any sb-* cookies on this host
+    document.cookie.split(';').forEach(c => {
+      const name = c.split('=')[0].trim();
+      if (name.startsWith('sb-') || name.includes('supabase')) {
+        document.cookie = name + '=; Max-Age=0; path=/';
+        document.cookie = name + '=; Max-Age=0; path=/; domain=' + location.hostname;
+      }
+    });
+  } catch (e) { console.warn('clearAuthStorage failed', e); }
+}
+
+// Show the login UI in a clean state. Used by logout, ghost-session recovery,
+// and the login page mount check.
+function showLoginUI() {
+  const lp = document.getElementById('loginPage');
+  const app = document.getElementById('app');
+  if (lp) lp.style.display = 'flex';
+  if (app) app.style.display = 'none';
+  document.body.classList.add('login-mode');
+  const lu = document.getElementById('loginUser'); if (lu) lu.value = '';
+  const lpw = document.getElementById('loginPass'); if (lpw) lpw.value = '';
+  const sn = document.getElementById('signupName'); if (sn) sn.value = '';
+  const le = document.getElementById('loginError'); if (le) le.style.display = 'none';
+  if (typeof switchAuthTab === 'function') switchAuthTab('signin');
+}
+
 async function doLogout() {
-  try { const sb = await Cloud.waitForClient(); await sb.auth.signOut(); } catch(_){}
+  try {
+    const sb = await Cloud.waitForClient();
+    // global scope clears refresh tokens server-side too
+    await sb.auth.signOut({ scope: 'global' });
+  } catch(_){}
+  // Always wipe local artefacts even if the network call failed
+  clearAuthStorage();
   Cloud.unsubscribe();
   currentUser = null;
-  document.getElementById('loginPage').style.display = 'flex';
-  document.getElementById('app').style.display = 'none';
-  document.body.classList.add('login-mode');
-  document.getElementById('loginUser').value = '';
-  document.getElementById('loginPass').value = '';
-  const sn = document.getElementById('signupName'); if (sn) sn.value = '';
-  document.getElementById('loginError').style.display = 'none';
-  switchAuthTab('signin');
+  showLoginUI();
 }
 
 // Hydrate currentUser from a Supabase session.
@@ -1263,27 +1306,69 @@ async function enterAppForCurrentUser() {
 // Session bootstrap: handle sign-in / sign-out events from Supabase.
 (async function bootstrapAuth() {
   const sb = await Cloud.waitForClient();
+
+  // ----- Login page mount check -----
+  // If we land on the login page with a stored session that the server
+  // no longer accepts (a "ghost" session), wipe it before the user tries
+  // to sign in. We do this fire-and-forget so it never blocks UI.
+  (async () => {
+    try {
+      const { data, error } = await sb.auth.getSession();
+      if (error) {
+        clearAuthStorage();
+        showLoginUI();
+        return;
+      }
+      const sess = data?.session;
+      if (sess?.expires_at && sess.expires_at * 1000 < Date.now()) {
+        // Stored session is already expired — clear it.
+        try { await sb.auth.signOut({ scope: 'local' }); } catch(_){}
+        clearAuthStorage();
+        showLoginUI();
+      }
+    } catch (e) {
+      clearAuthStorage();
+      showLoginUI();
+    }
+  })();
+
   // Listener FIRST (per Supabase guidance), then read current session.
-  sb.auth.onAuthStateChange(async (_event, session) => {
-    if (session?.user) {
+  sb.auth.onAuthStateChange(async (event, session) => {
+    // Validity guard: treat token refresh failures / expired sessions as signed out.
+    const expired = session?.expires_at ? (session.expires_at * 1000 < Date.now()) : false;
+    if (event === 'TOKEN_REFRESHED' && !session) {
+      // Refresh failed — ghost session. Clean up and show login.
+      clearAuthStorage();
+      currentUser = null;
+      Cloud.unsubscribe();
+      showLoginUI();
+      return;
+    }
+    if (session?.user && !expired) {
       // Profile may take a moment for the on-signup trigger to run; retry briefly.
       let ok = await hydrateSessionUser(session);
       let tries = 0;
       while (!ok && tries < 5) { await new Promise(r=>setTimeout(r, 250)); ok = await hydrateSessionUser(session); tries++; }
       if (ok) await enterAppForCurrentUser();
-    } else if (currentUser) {
-      // Signed out elsewhere — drop UI state.
+    } else {
+      // Signed out, expired, or invalid session — drop UI state and clean storage.
+      if (expired) clearAuthStorage();
       currentUser = null;
       Cloud.unsubscribe();
-      document.getElementById('loginPage').style.display = 'flex';
-      document.getElementById('app').style.display = 'none';
-      document.body.classList.add('login-mode');
+      showLoginUI();
     }
   });
   const { data } = await sb.auth.getSession();
-  if (data?.session?.user) {
+  const boot = data?.session;
+  const bootExpired = boot?.expires_at ? (boot.expires_at * 1000 < Date.now()) : false;
+  if (boot?.user && !bootExpired) {
     const ok = await hydrateSessionUser(data.session);
     if (ok) await enterAppForCurrentUser();
+  } else if (boot && bootExpired) {
+    // Stored but expired — purge so the next sign-in attempt is clean.
+    try { await sb.auth.signOut({ scope: 'local' }); } catch(_){}
+    clearAuthStorage();
+    showLoginUI();
   }
 })();
 
