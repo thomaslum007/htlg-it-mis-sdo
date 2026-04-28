@@ -1622,7 +1622,12 @@ function getFilteredIssues(scope) {
   if (ws && ws.size) list = list.filter(i => ws.has(i.workstream));
   if (lb && lb.size) list = list.filter(i => (i.labels||[]).some(l => lb.has(l)));
   const gs = document.getElementById('globalSearch')?.value.toLowerCase();
-  if (gs) list = list.filter(i => i.title.toLowerCase().includes(gs) || (i.desc||'').toLowerCase().includes(gs) || String(i.id).includes(gs));
+  if (gs) list = list.filter(i =>
+    i.title.toLowerCase().includes(gs) ||
+    (i.desc||'').toLowerCase().includes(gs) ||
+    String(i.key||'').toLowerCase().includes(gs) ||
+    String(i.id).includes(gs)
+  );
   return list;
 }
 
@@ -1644,7 +1649,7 @@ function renderIssues() {
     const canDelete = currentUser?.role === 'admin';
     const labels = (i.labels||[]).map(l => { const lb = DB.labels.find(x=>x.name===l); return `<span class="badge" style="background:${(lb?.color||'#6c63ff')}22;color:${lb?.color||'#6c63ff'};margin:1px;">${escapeHtml(l)}</span>`; }).join('');
     return `<tr onclick="${canEdit ? `openEditIssue('${i.id}')` : ''}">
-      <td class="mono" style="color:var(--text3);font-size:11px;">#${escapeHtml(i.id)}</td>
+      <td class="mono" style="color:var(--text3);font-size:11px;">${escapeHtml(i.key || '—')}</td>
       <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;">${escapeHtml(i.title)}</td>
       <td><span class="badge badge-${(i.type||'').toLowerCase()}">${escapeHtml(i.type||'')}</span></td>
       <td><span class="badge badge-${statusKey(i.status)}">${escapeHtml(i.status||'')}</span></td>
