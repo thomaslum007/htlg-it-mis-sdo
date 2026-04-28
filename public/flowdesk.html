@@ -1843,7 +1843,7 @@ function kanbanCard(i, canDrag) {
     <div class="kanban-card-meta">
       <span class="badge badge-${(i.type||'').toLowerCase()}" style="font-size:10px;">${escapeHtml(i.type||'')}</span>
       <span class="prio-dot prio-${(i.priority||'').toLowerCase()}" title="${escapeHtml(i.priority||'')}" style="background:${prioColors[i.priority]}"></span>
-      <span class="kanban-card-id">#${escapeHtml(i.id)}</span>
+      <span class="kanban-card-id">${escapeHtml(i.key || '—')}</span>
       ${i.assignee ? `<span style="margin-left:auto;font-size:10px;color:var(--text3);">${escapeHtml(i.assignee.split(' ')[0])}</span>` : ''}
     </div>
     ${i.checklist?.length ? `<div style="font-size:10px;color:var(--text3);margin-top:6px;font-family:var(--mono);">${i.checklist.filter(c=>c.done).length}/${i.checklist.length} done</div>` : ''}
@@ -2322,7 +2322,7 @@ function renderFocus() {
     const canDelete = currentUser?.role === 'admin';
     const labels = (i.labels||[]).map(l => { const lb = DB.labels.find(x => (x.name||x) === l); const c = (lb?.color)||'#6c63ff'; return `<span class="badge" style="background:${c}22;color:${c};margin:1px;">${escapeHtml(l)}</span>`; }).join('');
     return `<tr ${canEdit ? `onclick="openEditIssue('${i.id}')"` : ''}>
-      <td><span class="mono text-sm text-muted">#${escapeHtml(String(i.id).slice(0,6))}</span></td>
+      <td><span class="mono text-sm text-muted">${escapeHtml(i.key || '—')}</span></td>
       <td><b>${escapeHtml(i.title)}</b></td>
       <td><span class="badge badge-${(i.type||'').toLowerCase()}">${escapeHtml(i.type||'')}</span></td>
       <td><span class="badge badge-${(i.status||'').toLowerCase().replace(/\s+/g,'')}">${escapeHtml(i.status||'')}</span></td>
