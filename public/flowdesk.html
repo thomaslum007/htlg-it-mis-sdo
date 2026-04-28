@@ -1915,7 +1915,7 @@ function showGanttTooltip(e, id) {
   if (!issue) return;
   const tt = document.getElementById('ganttTooltip');
   const done = issue.checklist?.length ? `${issue.checklist.filter(c=>c.done).length}/${issue.checklist.length} tasks` : 'No tasks';
-  tt.innerHTML = `<div class="gantt-tooltip-title">${escapeHtml(issue.title)}</div>
+  tt.innerHTML = `<div class="gantt-tooltip-title">${escapeHtml(issue.key ? issue.key + ' · ' : '')}${escapeHtml(issue.title)}</div>
     <div class="gantt-tooltip-row">📌 ${escapeHtml(issue.type||'')} · ${escapeHtml(issue.priority||'')}</div>
     <div class="gantt-tooltip-row">📋 ${escapeHtml(issue.status||'')}</div>
     <div class="gantt-tooltip-row">👤 ${escapeHtml(issue.assignee||'Unassigned')}</div>
@@ -2228,7 +2228,7 @@ function applyRoleVisibility() {
 // ====== EXCEL IMPORT/EXPORT ======
 function exportExcel() {
   const rows = DB.issues.map(i => ({
-    ID: i.id, Title: i.title, Type: i.type, Status: i.status, Priority: i.priority,
+    ID: i.key || i.id, Title: i.title, Type: i.type, Status: i.status, Priority: i.priority,
     Assignee: i.assignee||'', Workstream: i.workstream||'', Labels: (i.labels||[]).join(', '),
     StartDate: i.start||'', EndDate: i.end||'', Description: i.desc||'',
     ChecklistTotal: (i.checklist||[]).length,
