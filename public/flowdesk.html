@@ -160,6 +160,8 @@ input[type=text], input[type=password], input[type=date], input[type=email], sel
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 select option { background: var(--surface2); }
 textarea { resize: vertical; min-height: 80px; }
+.inline-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); text-transform: none; letter-spacing: 0; font-family: var(--font); cursor: pointer; }
+.inline-check input { width: auto; accent-color: var(--accent); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
 
