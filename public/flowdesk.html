@@ -1096,7 +1096,7 @@ let DB = {
   priorities: ['Critical', 'High', 'Medium', 'Low'],
   activity: [],
   // Per-role tab permissions: view + interact (edit/create/drag)
-  // Pages: dashboard, issues, kanban, gantt, workstreams, settings
+  // Pages: dashboard, issues, kanban, gantt, focus, workstreams, settings
   permissions: null, // populated by initPermissions()
   dashboardSegments: { in_progress:['In Progress','In Review'], completed:['Done'], need_attention:['Blocked'] },
 };
@@ -1108,13 +1108,13 @@ let editingWsId = null;
 let chartInstances = {};
 let appSeeded = false; // fix: prevent re-seeding sample issues on every login
 
-const PERM_PAGES = ['dashboard','issues','kanban','gantt','workstreams','settings'];
+const PERM_PAGES = ['dashboard','issues','kanban','gantt','focus','workstreams','settings'];
 const PERM_ROLES = ['admin','pm','dev','viewer'];
 const DEFAULT_PERMISSIONS = {
-  admin:   { dashboard:{view:true,interact:true}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:true}, workstreams:{view:true,interact:true}, settings:{view:true,interact:true} },
-  pm:      { dashboard:{view:true,interact:true}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:true}, workstreams:{view:true,interact:true}, settings:{view:true,interact:false} },
-  dev:     { dashboard:{view:true,interact:false}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:false}, workstreams:{view:true,interact:false}, settings:{view:false,interact:false} },
-  viewer:  { dashboard:{view:true,interact:false}, issues:{view:true,interact:false}, kanban:{view:true,interact:false}, gantt:{view:true,interact:false}, workstreams:{view:true,interact:false}, settings:{view:false,interact:false} },
+  admin:   { dashboard:{view:true,interact:true}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:true}, focus:{view:true,interact:true}, workstreams:{view:true,interact:true}, settings:{view:true,interact:true} },
+  pm:      { dashboard:{view:true,interact:true}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:true}, focus:{view:true,interact:true}, workstreams:{view:true,interact:true}, settings:{view:true,interact:false} },
+  dev:     { dashboard:{view:true,interact:false}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:false}, focus:{view:true,interact:true}, workstreams:{view:true,interact:false}, settings:{view:false,interact:false} },
+  viewer:  { dashboard:{view:true,interact:false}, issues:{view:true,interact:false}, kanban:{view:true,interact:false}, gantt:{view:true,interact:false}, focus:{view:true,interact:false}, workstreams:{view:true,interact:false}, settings:{view:false,interact:false} },
 };
 function initPermissions() {
   if (DB.permissions) return;
