@@ -2141,6 +2141,7 @@ function renderUsers() {
     <td style="color:var(--text2);font-size:12px;">${escapeHtml(u.email||'—')}</td>
     <td><span class="role-badge role-${escapeHtml(u.role||'')}">${escapeHtml(u.role||'')}</span></td>
     <td style="font-size:12px;color:var(--text2);">${escapeHtml(u.dept||'—')}</td>
+    <td>${u.forcePasswordReset ? '<span class="badge badge-blocked">Reset required</span>' : '<span style="color:var(--text3);font-size:12px;">OK</span>'}</td>
     <td><div style="display:flex;gap:4px;">
       ${currentUser?.role==='admin' ? `<button class="btn btn-ghost btn-sm" onclick="openUserModal('${u.id}')">Edit</button>` : ''}
       ${currentUser?.role==='admin' && u.id!==currentUser.id ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">Delete</button>` : ''}
@@ -2159,13 +2160,18 @@ function openUserModal(id) {
     document.getElementById('userUsername').value = u.username;
     document.getElementById('userEmail').value = u.email||'';
     document.getElementById('userPassword').value = '';
+    document.getElementById('userPasswordConfirm').value = '';
+    document.getElementById('userPasswordHint').textContent = 'optional: enter to reset password';
+    document.getElementById('userForceReset').checked = !!u.forcePasswordReset;
     document.getElementById('userRole').value = u.role;
     document.getElementById('userDept').value = u.dept||'';
     document.getElementById('userResponsibilities').value = u.responsibilities||'';
   } else {
     document.getElementById('userModalTitle').textContent = 'Add User';
     document.getElementById('userId').value = '';
-    ['userName','userUsername','userEmail','userPassword','userDept','userResponsibilities'].forEach(id=>document.getElementById(id).value='');
+    ['userName','userUsername','userEmail','userPassword','userPasswordConfirm','userDept','userResponsibilities'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('userPasswordHint').textContent = 'required for new users';
+    document.getElementById('userForceReset').checked = false;
     document.getElementById('userRole').value = 'dev';
   }
   document.getElementById('userModal').classList.remove('hidden');
