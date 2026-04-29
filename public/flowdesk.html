@@ -1361,6 +1361,7 @@ async function enterAppForCurrentUser() {
   document.getElementById('sidebarRole').textContent = (currentUser.role||'').toUpperCase();
   document.getElementById('sidebarAvatar').textContent = (currentUser.name||'?')[0];
   await initApp();
+  if (currentUser.forcePasswordReset) openForcedPasswordReset();
 }
 
 // Session bootstrap: handle sign-in / sign-out events from Supabase.
@@ -1732,7 +1733,7 @@ function statusKey(s) {
   return map[s] || 'todo';
 }
 
-function globalSearchHandler(v) { renderIssues(); }
+function globalSearchHandler(v) { rerenderActivePage(); }
 
 // ====== ISSUE MODAL ======
 function populateIssueDropdowns() {
@@ -1769,7 +1770,7 @@ function openEditIssue(id) {
   if (!issue) return;
   if (!canEditIssue(issue)) { toast('You can only edit issues you created.', 'error'); return; }
   editingIssueId = id;
-  document.getElementById('issueModalTitle').textContent = 'Edit Issue ' + (issue.key || '#' + id);
+  document.getElementById('issueModalTitle').textContent = 'Edit Issue ' + (issue.key || 'Ticket');
   document.getElementById('issueId').value = id;
   populateIssueDropdowns();
   document.getElementById('issueTitle').value = issue.title;
