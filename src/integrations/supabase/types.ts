@@ -113,6 +113,7 @@ export type Database = {
           created_at: string
           dept: string | null
           email: string | null
+          force_password_reset: boolean
           id: string
           name: string
           responsibilities: string | null
@@ -124,6 +125,7 @@ export type Database = {
           created_at?: string
           dept?: string | null
           email?: string | null
+          force_password_reset?: boolean
           id: string
           name?: string
           responsibilities?: string | null
@@ -135,6 +137,7 @@ export type Database = {
           created_at?: string
           dept?: string | null
           email?: string | null
+          force_password_reset?: boolean
           id?: string
           name?: string
           responsibilities?: string | null
@@ -235,8 +238,11 @@ export type Database = {
           avatar_color: string
           created_at: string
           dept: string
+          email: string
+          force_password_reset: boolean
           id: string
           name: string
+          responsibilities: string
           username: string
         }[]
       }
