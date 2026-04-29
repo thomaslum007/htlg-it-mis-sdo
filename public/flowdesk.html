@@ -1051,7 +1051,7 @@ async function cloudHandleChange(kind) {
   if (kind === 'issues') {
     const { data } = await sb.from('issues').select('*').order('created_at');
     if (data) DB.issues = data.map(Cloud.mapIssueFromDB);
-    updateOpenCount();
+    updateOpenCount(); updateFocusCount();
   } else if (kind === 'workstreams') {
     const { data } = await sb.from('workstreams').select('*').order('created_at');
     if (data) DB.workstreams = data.map(Cloud.mapWsFromDB);
@@ -1955,11 +1955,12 @@ function renderGantt() {
     const width = Math.max(0.5, ((e-s)/86400000/totalDays*100)).toFixed(2);
     const color = barColors[idx % barColors.length];
     const done = issue.checklist?.length ? Math.round(issue.checklist.filter(c=>c.done).length/issue.checklist.length*100) : 0;
+    const editable = can('interact','gantt') && canEditIssue(issue);
     html += `<div class="gantt-row">
-      <div class="gantt-row-label"><span class="prio-dot prio-${(issue.priority||'').toLowerCase()}" style="flex-shrink:0;"></span>${escapeHtml(issue.title)}</div>
+      <div class="gantt-row-label" ${editable ? `onclick="openEditIssue('${issue.id}')" title="Edit ${escapeAttr(issue.key || 'ticket')}" style="cursor:pointer;"` : ''}><span class="prio-dot prio-${(issue.priority||'').toLowerCase()}" style="flex-shrink:0;"></span>${escapeHtml(issue.key ? issue.key + ' · ' : '')}${escapeHtml(issue.title)}</div>
       <div class="gantt-track">
         <div class="gantt-bar" style="left:${left}%;width:${width}%;background:${color}cc;border:1.5px solid ${color};"
-          onmouseenter="showGanttTooltip(event,'${issue.id}')" onmouseleave="hideGanttTooltip()">
+          onmouseenter="showGanttTooltip(event,'${issue.id}')" onmouseleave="hideGanttTooltip()" ${editable ? `onclick="openEditIssue('${issue.id}')" title="Edit ${escapeAttr(issue.key || 'ticket')}"` : ''}>
           ${parseFloat(width)>6 ? escapeHtml(issue.title) : ''}
         </div>
       </div>
