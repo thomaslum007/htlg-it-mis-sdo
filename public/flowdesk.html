@@ -160,6 +160,8 @@ input[type=text], input[type=password], input[type=date], input[type=email], sel
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 select option { background: var(--surface2); }
 textarea { resize: vertical; min-height: 80px; }
+.inline-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); text-transform: none; letter-spacing: 0; font-family: var(--font); cursor: pointer; }
+.inline-check input { width: auto; accent-color: var(--accent); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
 
@@ -621,7 +623,7 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
         <div class="table-wrap">
-          <table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Department</th><th>Actions</th></tr></thead>
+          <table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Department</th><th>Password</th><th>Actions</th></tr></thead>
           <tbody id="usersTbody"></tbody></table>
         </div>
       </div>
@@ -752,8 +754,16 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
         <label>Email</label>
         <input type="email" id="userEmail">
       </div>
-      <div class="form-group" style="display:none;">
-        <input type="password" id="userPassword">
+      <div class="form-group" id="userPasswordGroup">
+        <label>Password <span id="userPasswordHint" style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--text3);">required for new users; optional for reset</span></label>
+        <input type="password" id="userPassword" autocomplete="new-password">
+      </div>
+      <div class="form-group" id="userPasswordConfirmGroup">
+        <label>Confirm Password</label>
+        <input type="password" id="userPasswordConfirm" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label class="inline-check"><input type="checkbox" id="userForceReset"> Force password reset on next login</label>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -778,6 +788,30 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('userModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveUser()">Save User</button>
+    </div>
+  </div>
+</div>
+
+<!-- FORCED PASSWORD RESET -->
+<div class="modal-overlay hidden" id="forcePasswordModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <div class="modal-title">Reset Password Required</div>
+    </div>
+    <div class="modal-body">
+      <div class="settings-desc">Your admin requires a new password before you continue.</div>
+      <div class="form-group">
+        <label>New Password</label>
+        <input type="password" id="forceNewPassword" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label>Confirm New Password</label>
+        <input type="password" id="forceConfirmPassword" autocomplete="new-password">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="doLogout()">Sign Out</button>
+      <button class="btn btn-primary" onclick="submitForcedPasswordReset()">Update Password</button>
     </div>
   </div>
 </div>
@@ -868,7 +902,7 @@ const Cloud = {
     if (map.dashboard_segments)        DB.dashboardSegments = map.dashboard_segments;
   },
   mapProfileFromDB(r, role) {
-    return { id: r.id, name: r.name||'', username: r.username||'', email: r.email||'', role: role||'viewer', dept: r.dept||'', responsibilities: r.responsibilities||'', avatarColor: r.avatar_color };
+    return { id: r.id, name: r.name||'', username: r.username||'', email: r.email||'', role: role||'viewer', dept: r.dept||'', responsibilities: r.responsibilities||'', avatarColor: r.avatar_color, forcePasswordReset: !!r.force_password_reset };
   },
   mapWsFromDB(r) { return { id: r.id, name: r.name, dept: r.dept||'', desc: r.description||'', color: r.color||'#6c63ff' }; },
   mapIssueFromDB(r) {
@@ -885,6 +919,7 @@ const Cloud = {
   mapPermissionsFromDB(rp) {
     // rp shape: { role: { view:[pages], interact:[pages] } } -> internal { role: { page: { view, interact } } }
     const out = {};
+    const hasFocusConfig = Object.values(rp || {}).some(cfg => (cfg.view||[]).includes('focus') || (cfg.interact||[]).includes('focus'));
     for (const role of Object.keys(rp)) {
       out[role] = {};
       for (const page of PERM_PAGES) {
@@ -892,9 +927,10 @@ const Cloud = {
           view: (rp[role].view||[]).includes(page),
           interact: (rp[role].interact||[]).includes(page),
         };
+        if (page === 'focus' && !hasFocusConfig) out[role][page] = { ...DEFAULT_PERMISSIONS[role][page] };
       }
     }
-    return out;
+    return mergePermissions(out);
   },
   permissionsToDB() {
     const out = {};
@@ -965,6 +1001,13 @@ const Cloud = {
     const { error } = await sb.from('profiles').delete().eq('id', id);
     if (error) { console.error('deleteProfile', error); toast('Delete failed: ' + error.message,'error'); }
   },
+  async adminUserRequest(payload) {
+    const sb = await this.waitForClient();
+    const { data, error } = await sb.functions.invoke('admin-users', { body: payload });
+    if (error) { console.error('adminUserRequest', error); toast('User action failed: ' + error.message, 'error'); return null; }
+    if (data?.error) { toast('User action failed: ' + data.error, 'error'); return null; }
+    return data;
+  },
   // ----- Activity -----
   async logActivity(text) {
     const sb = await this.waitForClient();
@@ -1008,7 +1051,7 @@ async function cloudHandleChange(kind) {
   if (kind === 'issues') {
     const { data } = await sb.from('issues').select('*').order('created_at');
     if (data) DB.issues = data.map(Cloud.mapIssueFromDB);
-    updateOpenCount();
+    updateOpenCount(); updateFocusCount();
   } else if (kind === 'workstreams') {
     const { data } = await sb.from('workstreams').select('*').order('created_at');
     if (data) DB.workstreams = data.map(Cloud.mapWsFromDB);
@@ -1048,6 +1091,7 @@ function rerenderActivePage() {
   else if (id === 'page-issues')      renderIssues();
   else if (id === 'page-kanban')      renderKanban();
   else if (id === 'page-gantt')       renderGantt();
+  else if (id === 'page-focus')       renderFocus();
   else if (id === 'page-workstreams') renderWorkstreams();
   else if (id === 'page-settings')    renderSettings();
 }
@@ -1082,7 +1126,7 @@ let DB = {
   priorities: ['Critical', 'High', 'Medium', 'Low'],
   activity: [],
   // Per-role tab permissions: view + interact (edit/create/drag)
-  // Pages: dashboard, issues, kanban, gantt, workstreams, settings
+  // Pages: dashboard, issues, kanban, gantt, focus, workstreams, settings
   permissions: null, // populated by initPermissions()
   dashboardSegments: { in_progress:['In Progress','In Review'], completed:['Done'], need_attention:['Blocked'] },
 };
@@ -1094,21 +1138,33 @@ let editingWsId = null;
 let chartInstances = {};
 let appSeeded = false; // fix: prevent re-seeding sample issues on every login
 
-const PERM_PAGES = ['dashboard','issues','kanban','gantt','workstreams','settings'];
+const PERM_PAGES = ['dashboard','issues','kanban','gantt','focus','workstreams','settings'];
 const PERM_ROLES = ['admin','pm','dev','viewer'];
 const DEFAULT_PERMISSIONS = {
-  admin:   { dashboard:{view:true,interact:true}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:true}, workstreams:{view:true,interact:true}, settings:{view:true,interact:true} },
-  pm:      { dashboard:{view:true,interact:true}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:true}, workstreams:{view:true,interact:true}, settings:{view:true,interact:false} },
-  dev:     { dashboard:{view:true,interact:false}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:false}, workstreams:{view:true,interact:false}, settings:{view:false,interact:false} },
-  viewer:  { dashboard:{view:true,interact:false}, issues:{view:true,interact:false}, kanban:{view:true,interact:false}, gantt:{view:true,interact:false}, workstreams:{view:true,interact:false}, settings:{view:false,interact:false} },
+  admin:   { dashboard:{view:true,interact:true}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:true}, focus:{view:true,interact:true}, workstreams:{view:true,interact:true}, settings:{view:true,interact:true} },
+  pm:      { dashboard:{view:true,interact:true}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:true}, focus:{view:true,interact:true}, workstreams:{view:true,interact:true}, settings:{view:true,interact:false} },
+  dev:     { dashboard:{view:true,interact:false}, issues:{view:true,interact:true}, kanban:{view:true,interact:true}, gantt:{view:true,interact:false}, focus:{view:true,interact:true}, workstreams:{view:true,interact:false}, settings:{view:false,interact:false} },
+  viewer:  { dashboard:{view:true,interact:false}, issues:{view:true,interact:false}, kanban:{view:true,interact:false}, gantt:{view:true,interact:false}, focus:{view:true,interact:false}, workstreams:{view:true,interact:false}, settings:{view:false,interact:false} },
 };
 function initPermissions() {
   if (DB.permissions) return;
   try {
     const saved = localStorage.getItem('flowdesk_permissions');
-    if (saved) { DB.permissions = JSON.parse(saved); return; }
+    if (saved) {
+      DB.permissions = mergePermissions(JSON.parse(saved));
+      return;
+    }
   } catch(_) {}
-  DB.permissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
+  DB.permissions = mergePermissions({});
+}
+function mergePermissions(src) {
+  const merged = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
+  for (const role of PERM_ROLES) {
+    for (const page of PERM_PAGES) {
+      merged[role][page] = { ...merged[role][page], ...(src?.[role]?.[page] || {}) };
+    }
+  }
+  return merged;
 }
 function can(action, page) {
   // action: 'view' | 'interact'
@@ -1305,6 +1361,7 @@ async function enterAppForCurrentUser() {
   document.getElementById('sidebarRole').textContent = (currentUser.role||'').toUpperCase();
   document.getElementById('sidebarAvatar').textContent = (currentUser.name||'?')[0];
   await initApp();
+  if (currentUser.forcePasswordReset) openForcedPasswordReset();
 }
 
 // Session bootstrap: handle sign-in / sign-out events from Supabase.
@@ -1676,7 +1733,7 @@ function statusKey(s) {
   return map[s] || 'todo';
 }
 
-function globalSearchHandler(v) { renderIssues(); }
+function globalSearchHandler(v) { rerenderActivePage(); }
 
 // ====== ISSUE MODAL ======
 function populateIssueDropdowns() {
@@ -1713,7 +1770,7 @@ function openEditIssue(id) {
   if (!issue) return;
   if (!canEditIssue(issue)) { toast('You can only edit issues you created.', 'error'); return; }
   editingIssueId = id;
-  document.getElementById('issueModalTitle').textContent = 'Edit Issue ' + (issue.key || '#' + id);
+  document.getElementById('issueModalTitle').textContent = 'Edit Issue ' + (issue.key || 'Ticket');
   document.getElementById('issueId').value = id;
   populateIssueDropdowns();
   document.getElementById('issueTitle').value = issue.title;
@@ -1898,11 +1955,12 @@ function renderGantt() {
     const width = Math.max(0.5, ((e-s)/86400000/totalDays*100)).toFixed(2);
     const color = barColors[idx % barColors.length];
     const done = issue.checklist?.length ? Math.round(issue.checklist.filter(c=>c.done).length/issue.checklist.length*100) : 0;
+    const editable = can('interact','gantt') && canEditIssue(issue);
     html += `<div class="gantt-row">
-      <div class="gantt-row-label"><span class="prio-dot prio-${(issue.priority||'').toLowerCase()}" style="flex-shrink:0;"></span>${escapeHtml(issue.title)}</div>
+      <div class="gantt-row-label" ${editable ? `onclick="openEditIssue('${issue.id}')" title="Edit ${escapeAttr(issue.key || 'ticket')}" style="cursor:pointer;"` : ''}><span class="prio-dot prio-${(issue.priority||'').toLowerCase()}" style="flex-shrink:0;"></span>${escapeHtml(issue.key ? issue.key + ' · ' : '')}${escapeHtml(issue.title)}</div>
       <div class="gantt-track">
         <div class="gantt-bar" style="left:${left}%;width:${width}%;background:${color}cc;border:1.5px solid ${color};"
-          onmouseenter="showGanttTooltip(event,'${issue.id}')" onmouseleave="hideGanttTooltip()">
+          onmouseenter="showGanttTooltip(event,'${issue.id}')" onmouseleave="hideGanttTooltip()" ${editable ? `onclick="openEditIssue('${issue.id}')" title="Edit ${escapeAttr(issue.key || 'ticket')}"` : ''}>
           ${parseFloat(width)>6 ? escapeHtml(issue.title) : ''}
         </div>
       </div>
@@ -2083,6 +2141,7 @@ function renderUsers() {
     <td style="color:var(--text2);font-size:12px;">${escapeHtml(u.email||'—')}</td>
     <td><span class="role-badge role-${escapeHtml(u.role||'')}">${escapeHtml(u.role||'')}</span></td>
     <td style="font-size:12px;color:var(--text2);">${escapeHtml(u.dept||'—')}</td>
+    <td>${u.forcePasswordReset ? '<span class="badge badge-blocked">Reset required</span>' : '<span style="color:var(--text3);font-size:12px;">OK</span>'}</td>
     <td><div style="display:flex;gap:4px;">
       ${currentUser?.role==='admin' ? `<button class="btn btn-ghost btn-sm" onclick="openUserModal('${u.id}')">Edit</button>` : ''}
       ${currentUser?.role==='admin' && u.id!==currentUser.id ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">Delete</button>` : ''}
@@ -2101,49 +2160,87 @@ function openUserModal(id) {
     document.getElementById('userUsername').value = u.username;
     document.getElementById('userEmail').value = u.email||'';
     document.getElementById('userPassword').value = '';
+    document.getElementById('userPasswordConfirm').value = '';
+    document.getElementById('userPasswordHint').textContent = 'optional: enter to reset password';
+    document.getElementById('userForceReset').checked = !!u.forcePasswordReset;
     document.getElementById('userRole').value = u.role;
     document.getElementById('userDept').value = u.dept||'';
     document.getElementById('userResponsibilities').value = u.responsibilities||'';
   } else {
     document.getElementById('userModalTitle').textContent = 'Add User';
     document.getElementById('userId').value = '';
-    ['userName','userUsername','userEmail','userPassword','userDept','userResponsibilities'].forEach(id=>document.getElementById(id).value='');
+    ['userName','userUsername','userEmail','userPassword','userPasswordConfirm','userDept','userResponsibilities'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('userPasswordHint').textContent = 'required for new users';
+    document.getElementById('userForceReset').checked = false;
     document.getElementById('userRole').value = 'dev';
   }
   document.getElementById('userModal').classList.remove('hidden');
 }
 
-function saveUser() {
+async function saveUser() {
   const name = document.getElementById('userName').value.trim();
   const username = document.getElementById('userUsername').value.trim();
+  const email = document.getElementById('userEmail').value.trim();
+  const password = document.getElementById('userPassword').value;
+  const confirmPassword = document.getElementById('userPasswordConfirm').value;
   if (!name || !username) { toast('Name and username required','error'); return; }
+  if (!email) { toast('Email required','error'); return; }
+  if (!editingUserId && !password) { toast('Password required for new users','error'); return; }
+  if (password !== confirmPassword) { toast('Passwords do not match','error'); return; }
   const data = {
-    name, username, email: document.getElementById('userEmail').value, role: document.getElementById('userRole').value,
-    dept: document.getElementById('userDept').value, responsibilities: document.getElementById('userResponsibilities').value
+    name, username, email, password, role: document.getElementById('userRole').value,
+    dept: document.getElementById('userDept').value, responsibilities: document.getElementById('userResponsibilities').value,
+    forcePasswordReset: document.getElementById('userForceReset').checked
   };
   if (editingUserId) {
-    const idx = DB.users.findIndex(u=>u.id===editingUserId);
-    const merged = { ...DB.users[idx], ...data };
-    DB.users[idx] = merged;
-    Cloud.upsertProfile(merged).then(saved => { if (saved) { const i = DB.users.findIndex(x=>x.id===saved.id); if (i>=0) DB.users[i]={...DB.users[i], ...saved, role: merged.role}; renderUsers(); populateFilters(); }});
-    toast('User updated','success');
+    const saved = await Cloud.adminUserRequest({ action:'update', userId: editingUserId, ...data });
+    if (!saved) return;
+    toast(password ? 'User updated and password reset' : 'User updated','success');
   } else {
-    toast('New users must sign up themselves on the login page. Share the app URL with them.', 'info');
-    closeModal('userModal');
-    return;
+    const saved = await Cloud.adminUserRequest({ action:'create', ...data });
+    if (!saved) return;
+    toast('User created','success');
   }
-  closeModal('userModal'); renderUsers(); populateFilters();
+  closeModal('userModal');
+  await cloudHandleChange('users');
+  renderUsers(); populateFilters();
 }
 
-function deleteUser(id) {
+async function deleteUser(id) {
   if (!confirm('Delete this user?')) return;
+  const saved = await Cloud.adminUserRequest({ action:'delete', userId:id });
+  if (!saved) return;
   DB.users = DB.users.filter(u=>u.id!==id);
-  Cloud.deleteProfile(id);
   renderUsers(); toast('User deleted','info');
 }
 
+function openForcedPasswordReset() {
+  const modal = document.getElementById('forcePasswordModal');
+  if (!modal) return;
+  document.getElementById('forceNewPassword').value = '';
+  document.getElementById('forceConfirmPassword').value = '';
+  modal.classList.remove('hidden');
+}
+
+async function submitForcedPasswordReset() {
+  const password = document.getElementById('forceNewPassword').value;
+  const confirmPassword = document.getElementById('forceConfirmPassword').value;
+  if (!password || password.length < 6) { toast('Password must be at least 6 characters.', 'error'); return; }
+  if (password !== confirmPassword) { toast('Passwords do not match.', 'error'); return; }
+  const sb = await Cloud.waitForClient();
+  const { error } = await sb.auth.updateUser({ password });
+  if (error) { toast('Password update failed: ' + error.message, 'error'); return; }
+  const { error: profileError } = await sb.from('profiles').update({ force_password_reset:false }).eq('id', currentUser.id);
+  if (profileError) { toast('Password updated, but reset flag could not be cleared.', 'error'); return; }
+  currentUser.forcePasswordReset = false;
+  const u = DB.users.find(x => x.id === currentUser.id);
+  if (u) u.forcePasswordReset = false;
+  closeModal('forcePasswordModal');
+  toast('Password updated successfully.', 'success');
+}
+
 // ====== ROLES & PERMISSIONS ======
-const PAGE_LABELS = { dashboard:'Dashboard', issues:'Issues', kanban:'Kanban', gantt:'Gantt', workstreams:'Workstreams', settings:'Settings' };
+const PAGE_LABELS = { dashboard:'Dashboard', issues:'Issues', kanban:'Kanban', gantt:'Gantt', focus:'Focus', workstreams:'Workstreams', settings:'Settings' };
 const ROLE_LABELS = { admin:'Admin', pm:'Project Manager', dev:'Developer', viewer:'Viewer' };
 
 function renderPermissions() {
