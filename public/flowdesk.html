@@ -891,6 +891,7 @@ const Cloud = {
   mapPermissionsFromDB(rp) {
     // rp shape: { role: { view:[pages], interact:[pages] } } -> internal { role: { page: { view, interact } } }
     const out = {};
+    const hasFocusConfig = Object.values(rp || {}).some(cfg => (cfg.view||[]).includes('focus') || (cfg.interact||[]).includes('focus'));
     for (const role of Object.keys(rp)) {
       out[role] = {};
       for (const page of PERM_PAGES) {
@@ -898,9 +899,10 @@ const Cloud = {
           view: (rp[role].view||[]).includes(page),
           interact: (rp[role].interact||[]).includes(page),
         };
+        if (page === 'focus' && !hasFocusConfig) out[role][page] = { ...DEFAULT_PERMISSIONS[role][page] };
       }
     }
-    return out;
+    return mergePermissions(out);
   },
   permissionsToDB() {
     const out = {};
