@@ -756,7 +756,11 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
       </div>
       <div class="form-group" id="userPasswordGroup">
         <label>Password <span id="userPasswordHint" style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--text3);">required for new users; optional for reset</span></label>
-        <input type="password" id="userPassword">
+        <input type="password" id="userPassword" autocomplete="new-password">
+      </div>
+      <div class="form-group" id="userPasswordConfirmGroup">
+        <label>Confirm Password</label>
+        <input type="password" id="userPasswordConfirm" autocomplete="new-password">
       </div>
       <div class="form-group">
         <label class="inline-check"><input type="checkbox" id="userForceReset"> Force password reset on next login</label>
@@ -784,6 +788,30 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('userModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveUser()">Save User</button>
+    </div>
+  </div>
+</div>
+
+<!-- FORCED PASSWORD RESET -->
+<div class="modal-overlay hidden" id="forcePasswordModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <div class="modal-title">Reset Password Required</div>
+    </div>
+    <div class="modal-body">
+      <div class="settings-desc">Your admin requires a new password before you continue.</div>
+      <div class="form-group">
+        <label>New Password</label>
+        <input type="password" id="forceNewPassword" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label>Confirm New Password</label>
+        <input type="password" id="forceConfirmPassword" autocomplete="new-password">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="doLogout()">Sign Out</button>
+      <button class="btn btn-primary" onclick="submitForcedPasswordReset()">Update Password</button>
     </div>
   </div>
 </div>
