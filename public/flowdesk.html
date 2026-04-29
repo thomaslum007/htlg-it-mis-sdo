@@ -1120,9 +1120,21 @@ function initPermissions() {
   if (DB.permissions) return;
   try {
     const saved = localStorage.getItem('flowdesk_permissions');
-    if (saved) { DB.permissions = JSON.parse(saved); return; }
+    if (saved) {
+      DB.permissions = mergePermissions(JSON.parse(saved));
+      return;
+    }
   } catch(_) {}
-  DB.permissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
+  DB.permissions = mergePermissions({});
+}
+function mergePermissions(src) {
+  const merged = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
+  for (const role of PERM_ROLES) {
+    for (const page of PERM_PAGES) {
+      merged[role][page] = { ...merged[role][page], ...(src?.[role]?.[page] || {}) };
+    }
+  }
+  return merged;
 }
 function can(action, page) {
   // action: 'view' | 'interact'
