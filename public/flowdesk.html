@@ -2177,37 +2177,45 @@ function openUserModal(id) {
   document.getElementById('userModal').classList.remove('hidden');
 }
 
-function saveUser() {
+async function saveUser() {
   const name = document.getElementById('userName').value.trim();
   const username = document.getElementById('userUsername').value.trim();
+  const email = document.getElementById('userEmail').value.trim();
+  const password = document.getElementById('userPassword').value;
+  const confirmPassword = document.getElementById('userPasswordConfirm').value;
   if (!name || !username) { toast('Name and username required','error'); return; }
+  if (!email) { toast('Email required','error'); return; }
+  if (!editingUserId && !password) { toast('Password required for new users','error'); return; }
+  if (password !== confirmPassword) { toast('Passwords do not match','error'); return; }
   const data = {
-    name, username, email: document.getElementById('userEmail').value, role: document.getElementById('userRole').value,
-    dept: document.getElementById('userDept').value, responsibilities: document.getElementById('userResponsibilities').value
+    name, username, email, password, role: document.getElementById('userRole').value,
+    dept: document.getElementById('userDept').value, responsibilities: document.getElementById('userResponsibilities').value,
+    forcePasswordReset: document.getElementById('userForceReset').checked
   };
   if (editingUserId) {
-    const idx = DB.users.findIndex(u=>u.id===editingUserId);
-    const merged = { ...DB.users[idx], ...data };
-    DB.users[idx] = merged;
-    Cloud.upsertProfile(merged).then(saved => { if (saved) { const i = DB.users.findIndex(x=>x.id===saved.id); if (i>=0) DB.users[i]={...DB.users[i], ...saved, role: merged.role}; renderUsers(); populateFilters(); }});
-    toast('User updated','success');
+    const saved = await Cloud.adminUserRequest({ action:'update', userId: editingUserId, ...data });
+    if (!saved) return;
+    toast(password ? 'User updated and password reset' : 'User updated','success');
   } else {
-    toast('New users must sign up themselves on the login page. Share the app URL with them.', 'info');
-    closeModal('userModal');
-    return;
+    const saved = await Cloud.adminUserRequest({ action:'create', ...data });
+    if (!saved) return;
+    toast('User created','success');
   }
-  closeModal('userModal'); renderUsers(); populateFilters();
+  closeModal('userModal');
+  await cloudHandleChange('users');
+  renderUsers(); populateFilters();
 }
 
-function deleteUser(id) {
+async function deleteUser(id) {
   if (!confirm('Delete this user?')) return;
+  const saved = await Cloud.adminUserRequest({ action:'delete', userId:id });
+  if (!saved) return;
   DB.users = DB.users.filter(u=>u.id!==id);
-  Cloud.deleteProfile(id);
   renderUsers(); toast('User deleted','info');
 }
 
 // ====== ROLES & PERMISSIONS ======
-const PAGE_LABELS = { dashboard:'Dashboard', issues:'Issues', kanban:'Kanban', gantt:'Gantt', workstreams:'Workstreams', settings:'Settings' };
+const PAGE_LABELS = { dashboard:'Dashboard', issues:'Issues', kanban:'Kanban', gantt:'Gantt', focus:'Focus', workstreams:'Workstreams', settings:'Settings' };
 const ROLE_LABELS = { admin:'Admin', pm:'Project Manager', dev:'Developer', viewer:'Viewer' };
 
 function renderPermissions() {
