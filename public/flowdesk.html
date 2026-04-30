@@ -1579,6 +1579,8 @@ async function initApp() {
   buildFilterUI();
   populateFilters();
   applyRoleVisibility();
+  // Load custom dashboard layout (admin-editable, per-user)
+  await loadDashLayout();
   // Default landing tab is Dashboard
   const dashNav = document.querySelector('.sidebar .nav-item');
   nav('dashboard', dashNav);
