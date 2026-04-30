@@ -1656,7 +1656,7 @@ function initDashPeriodControls() {
   if (!ySel || ySel._inited) return;
   ySel._inited = true;
   const years = new Set();
-  (DB.issues || []).forEach(i => { const d = i.start || i.created_at; if (d) years.add(new Date(d).getFullYear()); });
+  (DB.issues || []).forEach(i => { const d = i.start || i.created; if (d) years.add(new Date(d).getFullYear()); });
   years.add(new Date().getFullYear());
   const arr = [...years].sort((a,b)=>b-a);
   ySel.innerHTML = '<option value="">All Years</option>' + arr.map(y=>`<option value="${y}">${y}</option>`).join('');
@@ -1676,7 +1676,7 @@ function initDashPeriodControls() {
 function applyPeriodFilter(issues) {
   const f = dashState.filters; if (!f.year && !f.quarter && !f.month) return issues;
   return issues.filter(i => {
-    const d = i.start || i.created_at; if (!d) return false;
+    const d = i.start || i.created; if (!d)
     const dt = new Date(d);
     if (f.year && dt.getFullYear() !== Number(f.year)) return false;
     const m = dt.getMonth()+1;
