@@ -113,9 +113,13 @@ body.login-mode { display: block; }
 /* Cards */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; }
 .card-sm { padding: 14px 16px; }
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
-.grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+
+/* Chart containers — fixed aspect ratio so charts never balloon on zoom-out */
+.chart-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; min-height: 220px; }
+.chart-wrap > canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
 
 /* Badges / Status */
 .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; font-family: var(--mono); white-space: nowrap; }
@@ -309,10 +313,13 @@ textarea { resize: vertical; min-height: 80px; }
 .empty-sub { font-size: 13px; }
 
 /* Responsive */
+@media(max-width: 1024px) {
+  .grid-2 { grid-template-columns: 1fr; }
+}
 @media(max-width: 768px) {
   .sidebar { transform: translateX(-100%); }
   .main { margin-left: 0; }
-  .grid-4 { grid-template-columns: 1fr 1fr; }
+  .grid-4 { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
   .form-row { grid-template-columns: 1fr; }
 }
 .hidden { display: none !important; }
@@ -489,11 +496,11 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
     <div class="grid-2" style="gap:20px;">
       <div class="card">
         <div class="section-header"><div class="section-title">Issues by Status</div></div>
-        <canvas id="statusChart" height="180"></canvas>
+        <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
       </div>
       <div class="card">
         <div class="section-header"><div class="section-title">Priority Distribution</div></div>
-        <canvas id="priorityChart" height="180"></canvas>
+        <div class="chart-wrap"><canvas id="priorityChart"></canvas></div>
       </div>
     </div>
     <div class="card" style="margin-top:20px;">
