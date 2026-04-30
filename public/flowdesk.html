@@ -524,21 +524,48 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
       <div class="filter-title">Filters</div>
       <div class="filter-row" id="dash_filterRow"></div>
     </div>
-    <div class="grid-4 mb-4" id="statCards"></div>
-    <div class="grid-2" style="gap:20px;">
-      <div class="card">
-        <div class="section-header"><div class="section-title">Issues by Status</div></div>
-        <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+    <div class="dash-toolbar">
+      <label style="font-size:11px;color:var(--text2,#9090a8);text-transform:uppercase;letter-spacing:.04em;">Period</label>
+      <select id="dashYear"></select>
+      <select id="dashQuarter">
+        <option value="">All Quarters</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+      </select>
+      <select id="dashMonth">
+        <option value="">All Months</option>
+        <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+        <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+        <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+        <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+      </select>
+      <div class="spacer"></div>
+      <button id="dashEditBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="toggleDashEdit()">✏️ Edit Dashboard</button>
+      <button id="dashSaveBtn" class="btn btn-sm" style="display:none;background:var(--blue,#3b82f6);color:#fff;" onclick="saveDashLayout()">💾 Save</button>
+      <button id="dashResetBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="resetDashLayout()">↺ Reset</button>
+      <button id="dashCancelBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="cancelDashEdit()">Cancel</button>
+    </div>
+
+    <!-- Default (read-only) dashboard — shown when no custom layout -->
+    <div id="dashDefault">
+      <div class="grid-4 mb-4" id="statCards"></div>
+      <div class="grid-2" style="gap:20px;">
+        <div class="card">
+          <div class="section-header"><div class="section-title">Issues by Status</div></div>
+          <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="section-header"><div class="section-title">Priority Distribution</div></div>
+          <div class="chart-wrap"><canvas id="priorityChart"></canvas></div>
+        </div>
       </div>
-      <div class="card">
-        <div class="section-header"><div class="section-title">Priority Distribution</div></div>
-        <div class="chart-wrap"><canvas id="priorityChart"></canvas></div>
+      <div class="card" style="margin-top:20px;">
+        <div class="section-header"><div class="section-title">Recent Activity</div></div>
+        <div id="activityFeed"></div>
       </div>
     </div>
-    <div class="card" style="margin-top:20px;">
-      <div class="section-header"><div class="section-title">Recent Activity</div></div>
-      <div id="activityFeed"></div>
-    </div>
+
+    <!-- Custom dashboard grid (shown when a saved layout exists OR in edit mode) -->
+    <div id="dashCustom" class="grid-stack gridstack-host" style="display:none;"></div>
+    <button class="fab-add" id="dashAddBtn" onclick="openAddWidgetModal()">+ Add Widget</button>
   </div>
 
   <!-- ISSUES -->
