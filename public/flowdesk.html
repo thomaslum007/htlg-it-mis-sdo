@@ -1327,7 +1327,8 @@ async function doAuthSubmit() {
   const watchdog = setTimeout(() => {
     try { clearAuthStorage(); } catch(_){}
     if (btn) { btn.disabled = false; btn.textContent = btn.dataset._label || 'Sign In'; }
-    showMsg('Sign-in is taking too long. Stale session was cleared — please try again[Refresh page manually or press CTRL+R]. ');
+    showMsg('Sign-in is taking too long. Stale session was cleared — please try again 
+            [Refresh page manually or press CTRL+R]. ');
   }, 8000);
   try {
     // Always start sign-in from a clean slate so stale tokens cannot block us.
