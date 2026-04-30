@@ -271,6 +271,12 @@ textarea { resize: vertical; min-height: 80px; }
 /* Search */
 .search-input { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-family: var(--font); font-size: 13px; padding: 7px 12px; outline: none; transition: border 0.15s; width: 220px; }
 .search-input:focus { border-color: var(--accent); }
+/* Password show/hide eye toggle */
+.pw-wrap { position: relative; }
+.pw-wrap > input { padding-right: 40px !important; width: 100%; }
+.pw-toggle { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: transparent; border: 0; color: var(--text3); cursor: pointer; padding: 4px 6px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; }
+.pw-toggle:hover { color: var(--text); background: var(--surface2); }
+.pw-toggle svg { width: 16px; height: 16px; display: block; }
 
 /* Workstream */
 .ws-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; }
@@ -400,7 +406,10 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
     </div>
     <div class="form-group">
       <label>Password</label>
-      <input type="password" id="loginPass" placeholder="Enter password" autocomplete="current-password">
+      <div class="pw-wrap">
+        <input type="password" id="loginPass" placeholder="Enter password" autocomplete="current-password">
+        <button type="button" class="pw-toggle" aria-label="Show password" onclick="togglePw(this)" title="Show/hide password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
     </div>
     <button id="authPrimaryBtn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px;" onclick="doAuthSubmit()">Sign In</button>
     <div id="authHint" style="margin-top:16px;font-size:12px;color:var(--text3);text-align:center;">Sign in with your FlowDesk account. The first user to sign up becomes the admin.</div>
@@ -756,11 +765,17 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
       </div>
       <div class="form-group" id="userPasswordGroup">
         <label>Password <span id="userPasswordHint" style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--text3);">required for new users; optional for reset</span></label>
-        <input type="password" id="userPassword" autocomplete="new-password">
+        <div class="pw-wrap">
+          <input type="password" id="userPassword" autocomplete="new-password">
+          <button type="button" class="pw-toggle" aria-label="Show password" onclick="togglePw(this)" title="Show/hide password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
       </div>
       <div class="form-group" id="userPasswordConfirmGroup">
         <label>Confirm Password</label>
-        <input type="password" id="userPasswordConfirm" autocomplete="new-password">
+        <div class="pw-wrap">
+          <input type="password" id="userPasswordConfirm" autocomplete="new-password">
+          <button type="button" class="pw-toggle" aria-label="Show password" onclick="togglePw(this)" title="Show/hide password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
       </div>
       <div class="form-group">
         <label class="inline-check"><input type="checkbox" id="userForceReset"> Force password reset on next login</label>
@@ -802,11 +817,17 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
       <div class="settings-desc">Your admin requires a new password before you continue.</div>
       <div class="form-group">
         <label>New Password</label>
-        <input type="password" id="forceNewPassword" autocomplete="new-password">
+        <div class="pw-wrap">
+          <input type="password" id="forceNewPassword" autocomplete="new-password">
+          <button type="button" class="pw-toggle" aria-label="Show password" onclick="togglePw(this)" title="Show/hide password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
       </div>
       <div class="form-group">
         <label>Confirm New Password</label>
-        <input type="password" id="forceConfirmPassword" autocomplete="new-password">
+        <div class="pw-wrap">
+          <input type="password" id="forceConfirmPassword" autocomplete="new-password">
+          <button type="button" class="pw-toggle" aria-label="Show password" onclick="togglePw(this)" title="Show/hide password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -1236,7 +1257,18 @@ async function doAuthSubmit() {
   let sb;
   try { sb = await Cloud.waitForClient(); }
   catch (e) { showMsg('Could not reach the server. Check your connection.'); if (btn){btn.disabled=false; btn.textContent=btn.dataset._label||'Sign In';} return; }
+  // Watchdog: never let the button stay disabled forever.
+  const watchdog = setTimeout(() => {
+    try { clearAuthStorage(); } catch(_){}
+    if (btn) { btn.disabled = false; btn.textContent = btn.dataset._label || 'Sign In'; }
+    showMsg('Sign-in is taking too long. Stale session was cleared — please try again.');
+  }, 8000);
   try {
+    // Always start sign-in from a clean slate so stale tokens cannot block us.
+    if (authMode !== 'signup') {
+      try { await sb.auth.signOut({ scope: 'local' }); } catch(_){}
+      try { clearAuthStorage(); } catch(_){}
+    }
     if (authMode === 'signup') {
       const name = (document.getElementById('signupName').value||'').trim() || email.split('@')[0];
       const redirectTo = `${window.location.origin}${window.location.pathname}`;
@@ -1263,6 +1295,7 @@ async function doAuthSubmit() {
     else if (/failed to fetch|network/i.test(raw)) friendly = 'Network error reaching the server. Try again.';
     showMsg(friendly);
   } finally {
+    clearTimeout(watchdog);
     if (btn) { btn.disabled = false; btn.textContent = btn.dataset._label || (authMode === 'signup' ? 'Create Account' : 'Sign In'); }
   }
 }
@@ -1348,6 +1381,7 @@ async function hydrateSessionUser(session) {
     dept: prof?.dept || '',
     responsibilities: prof?.responsibilities || '',
     avatarColor: prof?.avatar_color || null,
+    forcePasswordReset: !!prof?.force_password_reset,
   };
   return true;
 }
@@ -2383,6 +2417,20 @@ function importExcel(input) {
 // ====== UTILS ======
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
+// Show/hide password toggle. Wired via inline onclick on .pw-toggle buttons.
+function togglePw(btn) {
+  const wrap = btn.closest('.pw-wrap');
+  const input = wrap && wrap.querySelector('input');
+  if (!input) return;
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+  btn.title = showing ? 'Show password' : 'Hide password';
+  btn.innerHTML = showing
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12A3 3 0 1 1 9.88 9.88"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+}
+
 function toast(msg, type='info') {
   const ct = document.getElementById('toastContainer');
   const t = document.createElement('div');
@@ -2394,7 +2442,14 @@ function toast(msg, type='info') {
 }
 
 // Keyboard shortcut
-document.addEventListener('keydown', e => { if (e.key==='Escape') document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(m=>m.classList.add('hidden')); });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(m => {
+    // Force-password-reset modal is mandatory — do not allow ESC to dismiss it.
+    if (m.id === 'forcePasswordModal') return;
+    m.classList.add('hidden');
+  });
+});
 document.addEventListener('keydown', e => { if (e.key==='n' && e.ctrlKey) { e.preventDefault(); openNewIssue(); } });
 
 // Enter-key submits login form + initial tab styling
