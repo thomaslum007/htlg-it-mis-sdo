@@ -2441,7 +2441,14 @@ function toast(msg, type='info') {
 }
 
 // Keyboard shortcut
-document.addEventListener('keydown', e => { if (e.key==='Escape') document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(m=>m.classList.add('hidden')); });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(m => {
+    // Force-password-reset modal is mandatory — do not allow ESC to dismiss it.
+    if (m.id === 'forcePasswordModal') return;
+    m.classList.add('hidden');
+  });
+});
 document.addEventListener('keydown', e => { if (e.key==='n' && e.ctrlKey) { e.preventDefault(); openNewIssue(); } });
 
 // Enter-key submits login form + initial tab styling
