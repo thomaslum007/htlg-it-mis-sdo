@@ -7,6 +7,9 @@
 
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Gridstack (drag/resize for editable dashboard, admin only). Loaded for everyone but lightweight. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack.min.css">
+<script src="https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack-all.js"></script>
 <script type="module">
   // Expose a Supabase client globally so the legacy inline script can use it.
   import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
