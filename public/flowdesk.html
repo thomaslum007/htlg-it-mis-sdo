@@ -7,6 +7,9 @@
 
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Gridstack (drag/resize for editable dashboard, admin only). Loaded for everyone but lightweight. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack.min.css">
+<script src="https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack-all.js"></script>
 <script type="module">
   // Expose a Supabase client globally so the legacy inline script can use it.
   import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -120,6 +123,35 @@ body.login-mode { display: block; }
 /* Chart containers — fixed aspect ratio so charts never balloon on zoom-out */
 .chart-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; min-height: 220px; }
 .chart-wrap > canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
+
+/* ----- Editable dashboard ----- */
+.dash-toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+.dash-toolbar .spacer { flex:1; }
+.dash-toolbar select { background:var(--bg2,#1a1a24); color:var(--text,#e6e6f0); border:1px solid var(--border,#2a2a38); border-radius:6px; padding:5px 8px; font-family:var(--mono,monospace); font-size:12px; }
+.gridstack-host { background: transparent; }
+.gridstack-host .grid-stack-item-content { background: var(--card,#161620); border:1px solid var(--border,#2a2a38); border-radius: var(--radius,8px); padding:14px; overflow:auto; display:flex; flex-direction:column; }
+.gridstack-host.editing .grid-stack-item-content { border-style: dashed; }
+.widget-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.widget-title { font-size:12px; font-weight:600; color:var(--text2,#9090a8); text-transform:uppercase; letter-spacing:.04em; flex:1; }
+.widget-actions { display:none; gap:4px; }
+.gridstack-host.editing .widget-actions { display:flex; }
+.widget-actions button { background:transparent; border:1px solid var(--border,#2a2a38); color:var(--text2,#9090a8); border-radius:4px; padding:2px 6px; font-size:11px; cursor:pointer; }
+.widget-actions button:hover { color:var(--text,#fff); border-color:var(--text2,#9090a8); }
+.widget-body { flex:1; min-height:0; position:relative; }
+.widget-kpi { display:flex; flex-direction:column; justify-content:center; align-items:flex-start; height:100%; }
+.widget-kpi .num { font-size: 36px; font-weight:700; font-family: var(--mono, monospace); }
+.widget-kpi .lbl { font-size: 12px; color: var(--text2,#9090a8); margin-top:4px; }
+.widget-table { width:100%; border-collapse:collapse; font-size:12px; }
+.widget-table th, .widget-table td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--border,#2a2a38); }
+.widget-table th { color: var(--text2,#9090a8); font-weight:500; text-transform:uppercase; font-size:10px; letter-spacing:.04em; }
+.fab-add { position: fixed; right: 24px; bottom: 24px; z-index: 50; border-radius: 999px; padding: 12px 18px; background: var(--blue,#3b82f6); color:#fff; border:none; cursor:pointer; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,.35); display:none; }
+.gridstack-host.editing ~ .fab-add, body.dash-editing .fab-add { display:inline-flex; }
+.modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:100; }
+.modal-backdrop .modal-card { background:var(--card,#161620); border:1px solid var(--border,#2a2a38); border-radius:10px; padding:20px; width:min(440px, 92vw); }
+.modal-card h3 { margin:0 0 12px 0; font-size:15px; }
+.modal-card label { display:block; font-size:11px; color:var(--text2,#9090a8); text-transform:uppercase; letter-spacing:.04em; margin:10px 0 4px; }
+.modal-card select, .modal-card input { width:100%; background:var(--bg2,#1a1a24); color:var(--text,#e6e6f0); border:1px solid var(--border,#2a2a38); border-radius:6px; padding:8px 10px; font-family:var(--font,inherit); font-size:13px; }
+.modal-card .row-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
 
 /* Badges / Status */
 .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; font-family: var(--mono); white-space: nowrap; }
@@ -492,21 +524,48 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
       <div class="filter-title">Filters</div>
       <div class="filter-row" id="dash_filterRow"></div>
     </div>
-    <div class="grid-4 mb-4" id="statCards"></div>
-    <div class="grid-2" style="gap:20px;">
-      <div class="card">
-        <div class="section-header"><div class="section-title">Issues by Status</div></div>
-        <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+    <div class="dash-toolbar">
+      <label style="font-size:11px;color:var(--text2,#9090a8);text-transform:uppercase;letter-spacing:.04em;">Period</label>
+      <select id="dashYear"></select>
+      <select id="dashQuarter">
+        <option value="">All Quarters</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+      </select>
+      <select id="dashMonth">
+        <option value="">All Months</option>
+        <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+        <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+        <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+        <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+      </select>
+      <div class="spacer"></div>
+      <button id="dashEditBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="toggleDashEdit()">✏️ Edit Dashboard</button>
+      <button id="dashSaveBtn" class="btn btn-sm" style="display:none;background:var(--blue,#3b82f6);color:#fff;" onclick="saveDashLayout()">💾 Save</button>
+      <button id="dashResetBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="resetDashLayout()">↺ Reset</button>
+      <button id="dashCancelBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="cancelDashEdit()">Cancel</button>
+    </div>
+
+    <!-- Default (read-only) dashboard — shown when no custom layout -->
+    <div id="dashDefault">
+      <div class="grid-4 mb-4" id="statCards"></div>
+      <div class="grid-2" style="gap:20px;">
+        <div class="card">
+          <div class="section-header"><div class="section-title">Issues by Status</div></div>
+          <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="section-header"><div class="section-title">Priority Distribution</div></div>
+          <div class="chart-wrap"><canvas id="priorityChart"></canvas></div>
+        </div>
       </div>
-      <div class="card">
-        <div class="section-header"><div class="section-title">Priority Distribution</div></div>
-        <div class="chart-wrap"><canvas id="priorityChart"></canvas></div>
+      <div class="card" style="margin-top:20px;">
+        <div class="section-header"><div class="section-title">Recent Activity</div></div>
+        <div id="activityFeed"></div>
       </div>
     </div>
-    <div class="card" style="margin-top:20px;">
-      <div class="section-header"><div class="section-title">Recent Activity</div></div>
-      <div id="activityFeed"></div>
-    </div>
+
+    <!-- Custom dashboard grid (shown when a saved layout exists OR in edit mode) -->
+    <div id="dashCustom" class="grid-stack gridstack-host" style="display:none;"></div>
+    <button class="fab-add" id="dashAddBtn" onclick="openAddWidgetModal()">+ Add Widget</button>
   </div>
 
   <!-- ISSUES -->
@@ -1520,6 +1579,8 @@ async function initApp() {
   buildFilterUI();
   populateFilters();
   applyRoleVisibility();
+  // Load custom dashboard layout (admin-editable, per-user)
+  await loadDashLayout();
   // Default landing tab is Dashboard
   const dashNav = document.querySelector('.sidebar .nav-item');
   nav('dashboard', dashNav);
@@ -1535,13 +1596,30 @@ function updateOpenCount() {
 
 // ====== DASHBOARD ======
 function renderDashboard() {
-  const issues = getFilteredIssues('dash');
+  initDashPeriodControls();
+  const issues = applyPeriodFilter(getFilteredIssues('dash'));
   const total = issues.length;
   const seg = DB.dashboardSegments || { in_progress:['In Progress'], completed:['Done'], need_attention:['Blocked'] };
   const inSeg = (i, key) => Array.isArray(seg[key]) && seg[key].includes(i.status);
   const inprog = issues.filter(i => inSeg(i, 'in_progress')).length;
   const done   = issues.filter(i => inSeg(i, 'completed')).length;
   const attn   = issues.filter(i => inSeg(i, 'need_attention') || i.priority === 'Critical').length;
+  // Show edit button only for admins
+  const editBtn = document.getElementById('dashEditBtn');
+  if (editBtn) editBtn.style.display = (currentUser && currentUser.role === 'admin') ? 'inline-flex' : 'none';
+
+  // If a custom layout exists (and not in edit mode toggling default), render it
+  if (dashState.layout && dashState.layout.length && !dashState.editing) {
+    showCustomDash(true);
+    renderCustomDash(issues);
+    return;
+  }
+  if (dashState.editing) {
+    showCustomDash(true);
+    renderCustomDash(issues);
+    return;
+  }
+  showCustomDash(false);
   document.getElementById('statCards').innerHTML = `
     <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">Total Issues</div></div>
     <div class="stat-card"><div class="stat-num" style="color:var(--blue)">${inprog}</div><div class="stat-label">In Progress</div></div>
@@ -1551,6 +1629,314 @@ function renderDashboard() {
   renderStatusChart(issues);
   renderPriorityChart(issues);
   renderActivity();
+}
+
+/* ===========================================================
+   Editable Dashboard (admin) — Phase 3
+=========================================================== */
+const dashState = {
+  editing: false,
+  layout: null,        // [{i,x,y,w,h,type,config}]
+  filters: { year:'', quarter:'', month:'' },
+  grid: null,          // gridstack instance
+  charts: {},          // widget id -> Chart instance
+};
+
+function showCustomDash(on) {
+  document.getElementById('dashDefault').style.display = on ? 'none' : '';
+  document.getElementById('dashCustom').style.display  = on ? '' : 'none';
+  document.body.classList.toggle('dash-editing', !!dashState.editing);
+  document.getElementById('dashSaveBtn').style.display   = dashState.editing ? 'inline-flex' : 'none';
+  document.getElementById('dashResetBtn').style.display  = dashState.editing ? 'inline-flex' : 'none';
+  document.getElementById('dashCancelBtn').style.display = dashState.editing ? 'inline-flex' : 'none';
+  const editBtn = document.getElementById('dashEditBtn');
+  if (editBtn) editBtn.textContent = dashState.editing ? '✓ Editing…' : '✏️ Edit Dashboard';
+}
+
+function initDashPeriodControls() {
+  const ySel = document.getElementById('dashYear');
+  if (!ySel || ySel._inited) return;
+  ySel._inited = true;
+  const years = new Set();
+  (DB.issues || []).forEach(i => { const d = i.start || i.created; if (d) years.add(new Date(d).getFullYear()); });
+  years.add(new Date().getFullYear());
+  const arr = [...years].sort((a,b)=>b-a);
+  ySel.innerHTML = '<option value="">All Years</option>' + arr.map(y=>`<option value="${y}">${y}</option>`).join('');
+  ySel.value = dashState.filters.year || '';
+  document.getElementById('dashQuarter').value = dashState.filters.quarter || '';
+  document.getElementById('dashMonth').value = dashState.filters.month || '';
+  ['dashYear','dashQuarter','dashMonth'].forEach(id=>{
+    document.getElementById(id).addEventListener('change', () => {
+      dashState.filters.year    = document.getElementById('dashYear').value;
+      dashState.filters.quarter = document.getElementById('dashQuarter').value;
+      dashState.filters.month   = document.getElementById('dashMonth').value;
+      renderDashboard();
+    });
+  });
+}
+
+function applyPeriodFilter(issues) {
+  const f = dashState.filters; if (!f.year && !f.quarter && !f.month) return issues;
+  return issues.filter(i => {
+    const d = i.start || i.created; if (!d) return false;
+    const dt = new Date(d);
+    if (f.year && dt.getFullYear() !== Number(f.year)) return false;
+    const m = dt.getMonth()+1;
+    if (f.month && m !== Number(f.month)) return false;
+    if (f.quarter) {
+      const q = Math.floor((m-1)/3)+1;
+      if (('Q'+q) !== f.quarter) return false;
+    }
+    return true;
+  });
+}
+
+async function loadDashLayout() {
+  if (!sb || !currentUser) return;
+  try {
+    const { data } = await sb.from('dashboard_layouts').select('*').eq('user_id', currentUser.id).maybeSingle();
+    if (data) {
+      dashState.layout = Array.isArray(data.layout) ? data.layout : [];
+      dashState.filters = Object.assign({year:'',quarter:'',month:''}, data.filters||{});
+    }
+  } catch(_) {}
+}
+
+async function saveDashLayout() {
+  if (!currentUser) return;
+  // Sync positions from grid
+  if (dashState.grid) {
+    const items = dashState.grid.save(false); // [{x,y,w,h,id}]
+    const map = new Map(items.map(n=>[String(n.id), n]));
+    dashState.layout = (dashState.layout||[]).map(w => {
+      const n = map.get(String(w.i)); if (!n) return w;
+      return { ...w, x:n.x, y:n.y, w:n.w, h:n.h };
+    });
+  }
+  const { error } = await sb.from('dashboard_layouts').upsert({
+    user_id: currentUser.id,
+    layout: dashState.layout || [],
+    filters: dashState.filters || {},
+    updated_at: new Date().toISOString(),
+  });
+  if (error) { alert('Save failed: ' + error.message); return; }
+  dashState.editing = false;
+  renderDashboard();
+}
+
+async function resetDashLayout() {
+  if (!confirm('Reset dashboard to default layout? Your custom widgets will be removed.')) return;
+  if (currentUser) await sb.from('dashboard_layouts').delete().eq('user_id', currentUser.id);
+  dashState.layout = null;
+  dashState.editing = false;
+  renderDashboard();
+}
+
+function cancelDashEdit() {
+  dashState.editing = false;
+  // Reload from server to discard unsaved
+  loadDashLayout().then(renderDashboard);
+}
+
+function toggleDashEdit() {
+  if (!currentUser || currentUser.role !== 'admin') return;
+  if (!dashState.editing && (!dashState.layout || !dashState.layout.length)) {
+    // Seed with a sensible default
+    dashState.layout = defaultDashLayout();
+  }
+  dashState.editing = !dashState.editing;
+  renderDashboard();
+}
+
+function defaultDashLayout() {
+  return [
+    { i:'w1', x:0, y:0, w:3, h:2, type:'kpi',  config:{ metric:'count', field:'', label:'Total Issues' } },
+    { i:'w2', x:3, y:0, w:3, h:2, type:'kpi',  config:{ metric:'count', field:'status', value:'In Progress', label:'In Progress' } },
+    { i:'w3', x:6, y:0, w:3, h:2, type:'kpi',  config:{ metric:'count', field:'status', value:'Done', label:'Completed' } },
+    { i:'w4', x:9, y:0, w:3, h:2, type:'kpi',  config:{ metric:'count', field:'priority', value:'Critical', label:'Critical' } },
+    { i:'w5', x:0, y:2, w:6, h:4, type:'pie',  config:{ field:'status', label:'Issues by Status' } },
+    { i:'w6', x:6, y:2, w:6, h:4, type:'bar',  config:{ field:'priority', label:'Priority Distribution' } },
+  ];
+}
+
+function renderCustomDash(issues) {
+  const host = document.getElementById('dashCustom');
+  if (!host) return;
+  host.classList.toggle('editing', !!dashState.editing);
+
+  // Destroy any existing chart instances
+  Object.values(dashState.charts).forEach(c=>{ try{c.destroy();}catch(_){} });
+  dashState.charts = {};
+
+  // Destroy existing grid before re-render
+  if (dashState.grid) { try { dashState.grid.destroy(false); } catch(_){} dashState.grid = null; }
+  host.innerHTML = '';
+
+  const widgets = dashState.layout || [];
+  widgets.forEach(w => {
+    const el = document.createElement('div');
+    el.className = 'grid-stack-item';
+    el.setAttribute('gs-id', w.i);
+    el.setAttribute('gs-x', w.x); el.setAttribute('gs-y', w.y);
+    el.setAttribute('gs-w', w.w); el.setAttribute('gs-h', w.h);
+    el.innerHTML = `
+      <div class="grid-stack-item-content">
+        <div class="widget-head">
+          <div class="widget-title">${escapeHtml((w.config && w.config.label) || w.type.toUpperCase())}</div>
+          <div class="widget-actions">
+            <button onclick="editWidget('${w.i}')">Edit</button>
+            <button onclick="removeWidget('${w.i}')">×</button>
+          </div>
+        </div>
+        <div class="widget-body" id="wbody-${w.i}"></div>
+      </div>`;
+    host.appendChild(el);
+  });
+
+  // Init Gridstack
+  if (window.GridStack) {
+    dashState.grid = GridStack.init({
+      column: 12, cellHeight: 60, margin: 8,
+      disableResize: !dashState.editing, disableDrag: !dashState.editing,
+      float: false,
+    }, host);
+  }
+
+  // Render widget bodies
+  widgets.forEach(w => renderWidget(w, issues));
+}
+
+function renderWidget(w, issues) {
+  const body = document.getElementById('wbody-'+w.i); if (!body) return;
+  const cfg = w.config || {};
+  const data = issues || applyPeriodFilter(getFilteredIssues('dash'));
+  if (w.type === 'kpi') {
+    let val = 0;
+    let pool = data;
+    if (cfg.field && cfg.value) pool = data.filter(i => String(i[cfg.field]||'') === cfg.value);
+    if (cfg.metric === 'distinct' && cfg.field) {
+      val = new Set(data.map(i => i[cfg.field]).filter(Boolean)).size;
+    } else if (cfg.metric === 'sum' && cfg.field) {
+      val = pool.reduce((s,i)=> s + (Number(i[cfg.field])||0), 0);
+    } else { // count
+      val = pool.length;
+    }
+    body.innerHTML = `<div class="widget-kpi"><div class="num">${val}</div><div class="lbl">${escapeHtml(cfg.label||'KPI')}</div></div>`;
+    return;
+  }
+  if (w.type === 'table') {
+    const cols = (cfg.columns && cfg.columns.length) ? cfg.columns : ['key','title','status','priority','assignee'];
+    body.innerHTML = `<table class="widget-table"><thead><tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>
+      <tbody>${data.slice(0,50).map(i=>`<tr>${cols.map(c=>`<td>${escapeHtml(String(i[c]==null?'':i[c]))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    return;
+  }
+  // chart types: bar / pie / line
+  const field = cfg.field || 'status';
+  const groups = {};
+  data.forEach(i => { const k = i[field] || '—'; groups[k] = (groups[k]||0) + 1; });
+  const labels = Object.keys(groups);
+  const values = labels.map(k => groups[k]);
+  const palette = ['#3b82f6','#06d6a0','#ffd166','#ff8c42','#ff4d4d','#a78bfa','#22d3ee','#f472b6'];
+  const colors = labels.map((_,idx)=> palette[idx % palette.length]);
+  body.innerHTML = '<canvas></canvas>';
+  const cv = body.querySelector('canvas');
+  let type = w.type === 'pie' ? 'pie' : (w.type === 'line' ? 'line' : 'bar');
+  dashState.charts[w.i] = new Chart(cv, {
+    type,
+    data: { labels, datasets: [{ data: values, backgroundColor: type==='line' ? colors[0]+'33' : colors.map(c=>c+'aa'), borderColor: type==='line' ? colors[0] : colors, borderWidth: 2, fill: type==='line' }] },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins: { legend:{ display: type!=='bar', labels:{ color:'#9090a8', font:{ size:11 } } } },
+      scales: type==='pie' ? {} : { x:{ ticks:{ color:'#9090a8' }, grid:{ color:'transparent' } }, y:{ ticks:{ color:'#9090a8' }, grid:{ color:'rgba(255,255,255,0.05)' } } }
+    }
+  });
+}
+
+function removeWidget(id) {
+  if (!dashState.editing) return;
+  dashState.layout = (dashState.layout||[]).filter(w => w.i !== id);
+  renderDashboard();
+}
+
+function editWidget(id) { openAddWidgetModal(id); }
+
+const WIDGET_FIELDS = ['status','priority','assignee','workstream','type'];
+
+function openAddWidgetModal(editId) {
+  const existing = editId ? (dashState.layout||[]).find(w=>w.i===editId) : null;
+  const cfg = existing ? existing.config || {} : {};
+  const type = existing ? existing.type : 'kpi';
+  const back = document.createElement('div'); back.className='modal-backdrop';
+  back.innerHTML = `
+    <div class="modal-card">
+      <h3>${editId?'Edit Widget':'Add Widget'}</h3>
+      <label>Type</label>
+      <select id="ww_type">
+        <option value="kpi" ${type==='kpi'?'selected':''}>KPI Tile</option>
+        <option value="bar" ${type==='bar'?'selected':''}>Bar Chart</option>
+        <option value="pie" ${type==='pie'?'selected':''}>Pie Chart</option>
+        <option value="line" ${type==='line'?'selected':''}>Line Chart</option>
+        <option value="table" ${type==='table'?'selected':''}>Table</option>
+      </select>
+      <label>Title</label>
+      <input id="ww_label" value="${escapeAttr(cfg.label||'')}" placeholder="Widget title"/>
+      <div id="ww_kpi_opts">
+        <label>Metric</label>
+        <select id="ww_metric">
+          <option value="count" ${cfg.metric==='count'?'selected':''}>Count</option>
+          <option value="sum" ${cfg.metric==='sum'?'selected':''}>Sum</option>
+          <option value="distinct" ${cfg.metric==='distinct'?'selected':''}>Distinct Count</option>
+        </select>
+        <label>Field (optional for total count)</label>
+        <select id="ww_field">
+          <option value="">(none — total)</option>
+          ${WIDGET_FIELDS.map(f=>`<option value="${f}" ${cfg.field===f?'selected':''}>${f}</option>`).join('')}
+        </select>
+        <label>Filter to value (optional)</label>
+        <input id="ww_value" value="${escapeAttr(cfg.value||'')}" placeholder="e.g. In Progress"/>
+      </div>
+      <div id="ww_chart_opts" style="display:none">
+        <label>Group by field</label>
+        <select id="ww_chart_field">
+          ${WIDGET_FIELDS.map(f=>`<option value="${f}" ${cfg.field===f?'selected':''}>${f}</option>`).join('')}
+        </select>
+      </div>
+      <div class="row-actions">
+        <button class="btn btn-ghost btn-sm" onclick="this.closest('.modal-backdrop').remove()">Cancel</button>
+        <button class="btn btn-sm" style="background:var(--blue,#3b82f6);color:#fff" onclick="commitWidgetModal('${editId||''}')">${editId?'Save':'Add'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(back);
+  const sync = () => {
+    const t = document.getElementById('ww_type').value;
+    document.getElementById('ww_kpi_opts').style.display   = t==='kpi' ? '' : 'none';
+    document.getElementById('ww_chart_opts').style.display = (t==='bar'||t==='pie'||t==='line') ? '' : 'none';
+  };
+  document.getElementById('ww_type').addEventListener('change', sync); sync();
+}
+
+function commitWidgetModal(editId) {
+  const t = document.getElementById('ww_type').value;
+  const label = document.getElementById('ww_label').value.trim() || (t.toUpperCase()+' widget');
+  let config = { label };
+  if (t === 'kpi') {
+    config.metric = document.getElementById('ww_metric').value;
+    config.field  = document.getElementById('ww_field').value;
+    config.value  = document.getElementById('ww_value').value.trim();
+  } else if (t === 'table') {
+    config.columns = ['key','title','status','priority','assignee'];
+  } else {
+    config.field = document.getElementById('ww_chart_field').value;
+  }
+  if (!dashState.layout) dashState.layout = [];
+  if (editId) {
+    dashState.layout = dashState.layout.map(w => w.i===editId ? { ...w, type:t, config } : w);
+  } else {
+    const id = 'w' + Date.now().toString(36);
+    const isKpi = t==='kpi';
+    dashState.layout.push({ i:id, x:0, y:99, w:isKpi?3:6, h:isKpi?2:4, type:t, config });
+  }
+  document.querySelector('.modal-backdrop')?.remove();
+  renderDashboard();
 }
 
 function renderStatusChart(issues) {
