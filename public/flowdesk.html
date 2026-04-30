@@ -1562,7 +1562,7 @@ function renderStatusChart(issues) {
   chartInstances.status = new Chart(ctx, {
     type: 'doughnut',
     data: { labels: DB.statuses.map(s=>s.name), datasets: [{ data: counts, backgroundColor: DB.statuses.map(s=>s.color+'99'), borderColor: DB.statuses.map(s=>s.color), borderWidth: 2 }] },
-    options: { responsive: true, plugins: { legend: { labels: { color: '#9090a8', font: { family: 'DM Mono', size: 11 } } } } }
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#9090a8', font: { family: 'DM Mono', size: 11 } } } } }
   });
 }
 
@@ -1576,7 +1576,7 @@ function renderPriorityChart(issues) {
   chartInstances.priority = new Chart(ctx, {
     type: 'bar',
     data: { labels: DB.priorities, datasets: [{ data: counts, backgroundColor: DB.priorities.map(p=>colors[p]+'88'), borderColor: DB.priorities.map(p=>colors[p]), borderWidth: 2, borderRadius: 4 }] },
-    options: { responsive: true, scales: { y: { ticks: { color:'#9090a8', font:{family:'DM Mono'} }, grid:{color:'rgba(255,255,255,0.05)'} }, x: { ticks: { color:'#9090a8', font:{family:'DM Mono'} }, grid:{color:'transparent'} } }, plugins: { legend:{ display:false } } }
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color:'#9090a8', font:{family:'DM Mono'} }, grid:{color:'rgba(255,255,255,0.05)'} }, x: { ticks: { color:'#9090a8', font:{family:'DM Mono'} }, grid:{color:'transparent'} } }, plugins: { legend:{ display:false } } }
   });
 }
 
