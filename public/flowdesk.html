@@ -1381,6 +1381,7 @@ async function hydrateSessionUser(session) {
     dept: prof?.dept || '',
     responsibilities: prof?.responsibilities || '',
     avatarColor: prof?.avatar_color || null,
+    forcePasswordReset: !!prof?.force_password_reset,
   };
   return true;
 }
