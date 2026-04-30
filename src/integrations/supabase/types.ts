@@ -47,6 +47,27 @@ export type Database = {
         }
         Relationships: []
       }
+      dashboard_layouts: {
+        Row: {
+          filters: Json
+          layout: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          filters?: Json
+          layout?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          filters?: Json
+          layout?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       issues: {
         Row: {
           assignee: string | null
