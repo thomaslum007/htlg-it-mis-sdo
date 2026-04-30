@@ -408,7 +408,7 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
       <label>Password</label>
       <div class="pw-wrap">
         <input type="password" id="loginPass" placeholder="Enter password" autocomplete="current-password">
-        <button type="button" class="pw-toggle" aria-label="Show password" onclick="togglePw(this)">${PW_EYE_SVG}</button>
+        <button type="button" class="pw-toggle" aria-label="Show password" onclick="togglePw(this)" title="Show/hide password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
       </div>
     </div>
     <button id="authPrimaryBtn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px;" onclick="doAuthSubmit()">Sign In</button>
