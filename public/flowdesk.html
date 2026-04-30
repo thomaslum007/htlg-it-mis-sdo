@@ -1676,7 +1676,7 @@ function initDashPeriodControls() {
 function applyPeriodFilter(issues) {
   const f = dashState.filters; if (!f.year && !f.quarter && !f.month) return issues;
   return issues.filter(i => {
-    const d = i.start || i.created; if (!d)
+    const d = i.start || i.created; if (!d) return false;
     const dt = new Date(d);
     if (f.year && dt.getFullYear() !== Number(f.year)) return false;
     const m = dt.getMonth()+1;
