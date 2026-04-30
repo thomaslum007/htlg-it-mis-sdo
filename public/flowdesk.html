@@ -124,6 +124,35 @@ body.login-mode { display: block; }
 .chart-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; min-height: 220px; }
 .chart-wrap > canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
 
+/* ----- Editable dashboard ----- */
+.dash-toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+.dash-toolbar .spacer { flex:1; }
+.dash-toolbar select { background:var(--bg2,#1a1a24); color:var(--text,#e6e6f0); border:1px solid var(--border,#2a2a38); border-radius:6px; padding:5px 8px; font-family:var(--mono,monospace); font-size:12px; }
+.gridstack-host { background: transparent; }
+.gridstack-host .grid-stack-item-content { background: var(--card,#161620); border:1px solid var(--border,#2a2a38); border-radius: var(--radius,8px); padding:14px; overflow:auto; display:flex; flex-direction:column; }
+.gridstack-host.editing .grid-stack-item-content { border-style: dashed; }
+.widget-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.widget-title { font-size:12px; font-weight:600; color:var(--text2,#9090a8); text-transform:uppercase; letter-spacing:.04em; flex:1; }
+.widget-actions { display:none; gap:4px; }
+.gridstack-host.editing .widget-actions { display:flex; }
+.widget-actions button { background:transparent; border:1px solid var(--border,#2a2a38); color:var(--text2,#9090a8); border-radius:4px; padding:2px 6px; font-size:11px; cursor:pointer; }
+.widget-actions button:hover { color:var(--text,#fff); border-color:var(--text2,#9090a8); }
+.widget-body { flex:1; min-height:0; position:relative; }
+.widget-kpi { display:flex; flex-direction:column; justify-content:center; align-items:flex-start; height:100%; }
+.widget-kpi .num { font-size: 36px; font-weight:700; font-family: var(--mono, monospace); }
+.widget-kpi .lbl { font-size: 12px; color: var(--text2,#9090a8); margin-top:4px; }
+.widget-table { width:100%; border-collapse:collapse; font-size:12px; }
+.widget-table th, .widget-table td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--border,#2a2a38); }
+.widget-table th { color: var(--text2,#9090a8); font-weight:500; text-transform:uppercase; font-size:10px; letter-spacing:.04em; }
+.fab-add { position: fixed; right: 24px; bottom: 24px; z-index: 50; border-radius: 999px; padding: 12px 18px; background: var(--blue,#3b82f6); color:#fff; border:none; cursor:pointer; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,.35); display:none; }
+.gridstack-host.editing ~ .fab-add, body.dash-editing .fab-add { display:inline-flex; }
+.modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:100; }
+.modal-backdrop .modal-card { background:var(--card,#161620); border:1px solid var(--border,#2a2a38); border-radius:10px; padding:20px; width:min(440px, 92vw); }
+.modal-card h3 { margin:0 0 12px 0; font-size:15px; }
+.modal-card label { display:block; font-size:11px; color:var(--text2,#9090a8); text-transform:uppercase; letter-spacing:.04em; margin:10px 0 4px; }
+.modal-card select, .modal-card input { width:100%; background:var(--bg2,#1a1a24); color:var(--text,#e6e6f0); border:1px solid var(--border,#2a2a38); border-radius:6px; padding:8px 10px; font-family:var(--font,inherit); font-size:13px; }
+.modal-card .row-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+
 /* Badges / Status */
 .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; font-family: var(--mono); white-space: nowrap; }
 .badge-todo { background: rgba(144,144,168,0.15); color: var(--text2); }
