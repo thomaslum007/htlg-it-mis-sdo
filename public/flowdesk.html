@@ -1257,7 +1257,18 @@ async function doAuthSubmit() {
   let sb;
   try { sb = await Cloud.waitForClient(); }
   catch (e) { showMsg('Could not reach the server. Check your connection.'); if (btn){btn.disabled=false; btn.textContent=btn.dataset._label||'Sign In';} return; }
+  // Watchdog: never let the button stay disabled forever.
+  const watchdog = setTimeout(() => {
+    try { clearAuthStorage(); } catch(_){}
+    if (btn) { btn.disabled = false; btn.textContent = btn.dataset._label || 'Sign In'; }
+    showMsg('Sign-in is taking too long. Stale session was cleared — please try again.');
+  }, 8000);
   try {
+    // Always start sign-in from a clean slate so stale tokens cannot block us.
+    if (authMode !== 'signup') {
+      try { await sb.auth.signOut({ scope: 'local' }); } catch(_){}
+      try { clearAuthStorage(); } catch(_){}
+    }
     if (authMode === 'signup') {
       const name = (document.getElementById('signupName').value||'').trim() || email.split('@')[0];
       const redirectTo = `${window.location.origin}${window.location.pathname}`;
@@ -1284,6 +1295,7 @@ async function doAuthSubmit() {
     else if (/failed to fetch|network/i.test(raw)) friendly = 'Network error reaching the server. Try again.';
     showMsg(friendly);
   } finally {
+    clearTimeout(watchdog);
     if (btn) { btn.disabled = false; btn.textContent = btn.dataset._label || (authMode === 'signup' ? 'Create Account' : 'Sign In'); }
   }
 }
