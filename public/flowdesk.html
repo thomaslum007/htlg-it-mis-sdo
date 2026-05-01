@@ -511,9 +511,6 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
     <div class="topbar-right">
       <input class="search-input" id="globalSearch" placeholder="🔍  Search issues..." oninput="globalSearchHandler(this.value)">
       <button class="btn btn-primary" onclick="openNewIssue()">+ New Issue</button>
-      <button class="btn btn-ghost btn-sm" onclick="exportExcel()" title="Export Excel">📤 Export</button>
-      <button class="btn btn-ghost btn-sm" id="importBtn" onclick="triggerImport()" title="Import Excel (admin only)">📥 Import</button>
-      <input type="file" id="importFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importExcel(this)">
       <button class="btn btn-ghost btn-sm btn-icon" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
     </div>
   </div>
@@ -573,6 +570,11 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
     <div class="filter-bar">
       <div class="filter-title">Filters</div>
       <div class="filter-row" id="iss_filterRow"></div>
+      <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+        <button class="btn btn-ghost btn-sm" onclick="exportExcel()" title="Export Excel">📤 Export</button>
+        <button class="btn btn-ghost btn-sm" id="importBtn" onclick="triggerImport()" title="Import Excel (admin only)">📥 Import</button>
+        <input type="file" id="importFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importExcel(this)">
+      </div>
     </div>
     <div class="card" style="padding:0;overflow:hidden;">
       <div class="table-wrap">
