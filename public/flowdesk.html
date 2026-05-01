@@ -451,6 +451,7 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
       </div>
     </div>
     <button id="authPrimaryBtn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px;" onclick="doAuthSubmit()">Sign In</button>
+    <div class="pw-tip" id="pwTip" style="display:none;font-size:11px;color:var(--text3,#6c6c80);margin-top:4px;line-height:1.4;">Password must be at least 6 characters, include one uppercase letter, one lowercase letter, one number, and one special character.</div>
     <div id="authHint" style="margin-top:16px;font-size:12px;color:var(--text3);text-align:center;">Sign in with your FlowDesk account. The first user to sign up becomes the admin.</div>
   </div>
 </div>
@@ -511,9 +512,6 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
     <div class="topbar-right">
       <input class="search-input" id="globalSearch" placeholder="🔍  Search issues..." oninput="globalSearchHandler(this.value)">
       <button class="btn btn-primary" onclick="openNewIssue()">+ New Issue</button>
-      <button class="btn btn-ghost btn-sm" onclick="exportExcel()" title="Export Excel">📤 Export</button>
-      <button class="btn btn-ghost btn-sm" id="importBtn" onclick="triggerImport()" title="Import Excel (admin only)">📥 Import</button>
-      <input type="file" id="importFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importExcel(this)">
       <button class="btn btn-ghost btn-sm btn-icon" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
     </div>
   </div>
@@ -573,6 +571,11 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
     <div class="filter-bar">
       <div class="filter-title">Filters</div>
       <div class="filter-row" id="iss_filterRow"></div>
+      <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+        <button class="btn btn-ghost btn-sm" onclick="exportExcel()" title="Export Excel">📤 Export</button>
+        <button class="btn btn-ghost btn-sm" id="importBtn" onclick="triggerImport()" title="Import Excel (admin only)">📥 Import</button>
+        <input type="file" id="importFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importExcel(this)">
+      </div>
     </div>
     <div class="card" style="padding:0;overflow:hidden;">
       <div class="table-wrap">
@@ -647,7 +650,6 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
       <div class="tab" onclick="settingsTab('labels',this)">Labels</div>
       <div class="tab" onclick="settingsTab('statuses',this)">Statuses</div>
       <div class="tab" onclick="settingsTab('users',this)">Users</div>
-      <div class="tab" onclick="settingsTab('dashboard',this)">Dashboard</div>
       <div class="tab" onclick="settingsTab('permissions',this)">Roles &amp; Permissions</div>
     </div>
     <div id="settings-general" class="settings-content">
@@ -700,16 +702,6 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
         <div class="table-wrap">
           <table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Department</th><th>Password</th><th>Actions</th></tr></thead>
           <tbody id="usersTbody"></tbody></table>
-        </div>
-      </div>
-    </div>
-    <div id="settings-dashboard" class="settings-content hidden">
-      <div class="settings-section">
-        <div class="settings-title">Dashboard Segments</div>
-        <div class="settings-desc">Choose which statuses count toward each Dashboard KPI. <b>Admin only.</b></div>
-        <div class="seg-editor" id="segEditor"></div>
-        <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;">
-          <button class="btn btn-primary btn-sm" id="saveSegBtn" onclick="saveDashboardSegments()">Save Segments</button>
         </div>
       </div>
     </div>
@@ -895,6 +887,8 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
           <button type="button" class="pw-toggle" aria-label="Show password" onclick="togglePw(this)" title="Show/hide password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
       </div>
+    </div>
+      <div style="font-size:11px;color:var(--text3,#6c6c80);margin-top:4px;line-height:1.4;">Password must be at least 6 characters, include one uppercase letter, one lowercase letter, one number, and one special character.</div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="doLogout()">Sign Out</button>
@@ -1279,6 +1273,7 @@ function fmtDate(d) {
 let authMode = 'signin'; // 'signin' | 'signup'
 function switchAuthTab(mode) {
   authMode = mode;
+  const pwTip = document.getElementById('pwTip'); if (pwTip) pwTip.style.display = mode==='signup' ? 'block' : 'none';
   const su = document.getElementById('signupOnly');
   const btn = document.getElementById('authPrimaryBtn');
   const hint = document.getElementById('authHint');
@@ -2506,11 +2501,10 @@ function settingsTab(tab, el) {
   el.classList.add('active');
   if (tab==='users') renderUsers();
   if (tab==='permissions') renderPermissions();
-  if (tab==='dashboard') renderDashboardSegments();
 }
 
 function renderSettings() {
-  renderTypeList(); renderPriorityList(); renderLabelList(); renderStatusList(); renderUsers(); renderPermissions(); renderDashboardSegments();
+  renderTypeList(); renderPriorityList(); renderLabelList(); renderStatusList(); renderUsers(); renderPermissions();
 }
 
 function renderTypeList() {
@@ -2521,9 +2515,9 @@ function renderTypeList() {
 function addType() {
   const v = document.getElementById('newType').value.trim(); if (!v) return;
   DB.types.push({name:v, color:document.getElementById('typeColor').value});
-  document.getElementById('newType').value=''; renderTypeList(); populateFilters(); toast('Type added','success');
+  document.getElementById('newType').value=''; Cloud.saveSetting('types', DB.types); renderTypeList(); populateFilters(); toast('Type added','success');
 }
-function removeType(i) { DB.types.splice(i,1); renderTypeList(); }
+function removeType(i) { DB.types.splice(i,1); Cloud.saveSetting('types', DB.types); renderTypeList(); populateFilters(); }
 
 function renderPriorityList() {
   const colors = { Critical:'var(--critical)', High:'var(--high)', Medium:'var(--medium)', Low:'var(--low)' };
@@ -2539,9 +2533,9 @@ function renderLabelList() {
 function addLabel() {
   const v = document.getElementById('newLabel').value.trim(); if (!v) return;
   DB.labels.push({name:v, color:document.getElementById('labelColor').value});
-  document.getElementById('newLabel').value=''; renderLabelList(); toast('Label added','success');
+  document.getElementById('newLabel').value=''; Cloud.saveSetting('labels', DB.labels); renderLabelList(); toast('Label added','success');
 }
-function removeLabel(i) { DB.labels.splice(i,1); renderLabelList(); }
+function removeLabel(i) { DB.labels.splice(i,1); Cloud.saveSetting('labels', DB.labels); renderLabelList(); }
 
 function renderStatusList() {
   document.getElementById('statusList').innerHTML = DB.statuses.map((s,i) =>
@@ -2551,9 +2545,9 @@ function renderStatusList() {
 function addStatus() {
   const v = document.getElementById('newStatus').value.trim(); if (!v) return;
   DB.statuses.push({name:v, color:document.getElementById('statusColor').value});
-  document.getElementById('newStatus').value=''; renderStatusList(); populateFilters(); toast('Status added','success');
+  document.getElementById('newStatus').value=''; Cloud.saveSetting('statuses', DB.statuses); renderStatusList(); populateFilters(); toast('Status added','success');
 }
-function removeStatus(i) { DB.statuses.splice(i,1); renderStatusList(); populateFilters(); }
+function removeStatus(i) { DB.statuses.splice(i,1); Cloud.saveSetting('statuses', DB.statuses); renderStatusList(); populateFilters(); }
 
 // ====== USERS ======
 function renderUsers() {
@@ -2649,21 +2643,38 @@ function openForcedPasswordReset() {
   modal.classList.remove('hidden');
 }
 
+
+function validatePassword(pw) {
+  if (pw.length < 6) return 'Password must be at least 6 characters.';
+  if (!/[A-Z]/.test(pw)) return 'Password must include an uppercase letter.';
+  if (!/[a-z]/.test(pw)) return 'Password must include a lowercase letter.';
+  if (!/[0-9]/.test(pw)) return 'Password must include a number.';
+  if (!/[^A-Za-z0-9]/.test(pw)) return 'Password must include a special character.';
+  return null;
+}
 async function submitForcedPasswordReset() {
   const password = document.getElementById('forceNewPassword').value;
   const confirmPassword = document.getElementById('forceConfirmPassword').value;
-  if (!password || password.length < 6) { toast('Password must be at least 6 characters.', 'error'); return; }
+  const pwErr = validatePassword(password);
+  if (pwErr) { toast(pwErr, 'error'); return; }
   if (password !== confirmPassword) { toast('Passwords do not match.', 'error'); return; }
+  if (!confirm('Are you sure you want to set this as your new password?')) return;
   const sb = await Cloud.waitForClient();
   const { error } = await sb.auth.updateUser({ password });
   if (error) { toast('Password update failed: ' + error.message, 'error'); return; }
-  const { error: profileError } = await sb.from('profiles').update({ force_password_reset:false }).eq('id', currentUser.id);
-  if (profileError) { toast('Password updated, but reset flag could not be cleared.', 'error'); return; }
+  // Clear the force_password_reset flag
+  const { error: profileError } = await sb.from('profiles').update({ force_password_reset: false }).eq('id', currentUser.id);
+  if (profileError) { console.error('Could not clear force_password_reset flag', profileError); }
   currentUser.forcePasswordReset = false;
   const u = DB.users.find(x => x.id === currentUser.id);
   if (u) u.forcePasswordReset = false;
+  // Refresh session to ensure updated profile is loaded
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) await sb.auth.refreshSession();
+  } catch(_) {}
   closeModal('forcePasswordModal');
-  toast('Password updated successfully.', 'success');
+  toast('Password updated successfully! Welcome to FlowDesk.', 'success');
 }
 
 // ====== ROLES & PERMISSIONS ======
