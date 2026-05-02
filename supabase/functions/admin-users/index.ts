@@ -68,6 +68,7 @@ Deno.serve(async (req) => {
         username,
         email,
         dept: body.dept ? String(body.dept) : null,
+        workstream: body.workstream ? String(body.workstream) : null,
         responsibilities: body.responsibilities ? String(body.responsibilities) : null,
         force_password_reset: !!body.forcePasswordReset,
       };
@@ -100,6 +101,7 @@ Deno.serve(async (req) => {
         username: String(body.username || '').trim(),
         email: body.email ? String(body.email).trim().toLowerCase() : null,
         dept: body.dept ? String(body.dept) : null,
+        workstream: body.workstream ? String(body.workstream) : null,
         responsibilities: body.responsibilities ? String(body.responsibilities) : null,
         force_password_reset: !!body.forcePasswordReset,
       };
