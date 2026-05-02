@@ -1814,9 +1814,16 @@ function renderWidget(w, issues) {
   if (w.type === 'kpi') {
     let val = 0;
     let pool = data;
-    if (cfg.field && cfg.value) pool = data.filter(i => String(i[cfg.field]||'') === cfg.value);
+    if (cfg.field) {
+      // Prefer expression; fallback to legacy `value`
+      const expr = cfg.filterExpr != null ? cfg.filterExpr : (cfg.value ? '@'+cfg.value : '');
+      const r = ww_parseExpr(expr);
+      if (r.ok && r.ast) {
+        pool = data.filter(i => ww_evalExpr(r.ast, i[cfg.field]));
+      }
+    }
     if (cfg.metric === 'distinct' && cfg.field) {
-      val = new Set(data.map(i => i[cfg.field]).filter(Boolean)).size;
+      val = new Set(pool.map(i => i[cfg.field]).filter(Boolean)).size;
     } else if (cfg.metric === 'sum' && cfg.field) {
       val = pool.reduce((s,i)=> s + (Number(i[cfg.field])||0), 0);
     } else { // count
@@ -1832,9 +1839,12 @@ function renderWidget(w, issues) {
     return;
   }
   // chart types: bar / pie / line
-  const field = cfg.field || 'status';
+  const fields = (Array.isArray(cfg.fields) && cfg.fields.length) ? cfg.fields : [cfg.field || 'status'];
   const groups = {};
-  data.forEach(i => { const k = i[field] || '—'; groups[k] = (groups[k]||0) + 1; });
+  data.forEach(i => {
+    const k = fields.map(f => i[f] || '—').join(' / ');
+    groups[k] = (groups[k]||0) + 1;
+  });
   const labels = Object.keys(groups);
   const values = labels.map(k => groups[k]);
   const palette = ['#3b82f6','#06d6a0','#ffd166','#ff8c42','#ff4d4d','#a78bfa','#22d3ee','#f472b6'];
