@@ -2658,7 +2658,9 @@ async function saveUser() {
   if (password !== confirmPassword) { toast('Passwords do not match','error'); return; }
   const data = {
     name, username, email, password, role: document.getElementById('userRole').value,
-    dept: document.getElementById('userDept').value, responsibilities: document.getElementById('userResponsibilities').value,
+    dept: document.getElementById('userDept').value,
+    workstream: document.getElementById('userWorkstream').value,
+    responsibilities: document.getElementById('userResponsibilities').value,
     forcePasswordReset: document.getElementById('userForceReset').checked
   };
   if (editingUserId) {
