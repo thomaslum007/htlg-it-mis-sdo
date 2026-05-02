@@ -2579,6 +2579,7 @@ function renderUsers() {
 function openUserModal(id) {
   if (currentUser?.role !== 'admin') { toast('Only admins can manage users.', 'error'); return; }
   editingUserId = id || null;
+  populateUserWorkstreamSelect();
   if (id) {
     const u = DB.users.find(x=>x.id===id);
     document.getElementById('userModalTitle').textContent = 'Edit User';
@@ -2591,17 +2592,58 @@ function openUserModal(id) {
     document.getElementById('userPasswordHint').textContent = 'optional: enter to reset password';
     document.getElementById('userForceReset').checked = !!u.forcePasswordReset;
     document.getElementById('userRole').value = u.role;
-    document.getElementById('userDept').value = u.dept||'';
+    document.getElementById('userWorkstream').value = u.workstream||'';
+    onUserWorkstreamChange(u.dept||'');
     document.getElementById('userResponsibilities').value = u.responsibilities||'';
   } else {
     document.getElementById('userModalTitle').textContent = 'Add User';
     document.getElementById('userId').value = '';
-    ['userName','userUsername','userEmail','userPassword','userPasswordConfirm','userDept','userResponsibilities'].forEach(id=>document.getElementById(id).value='');
+    ['userName','userUsername','userEmail','userPassword','userPasswordConfirm','userResponsibilities'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('userWorkstream').value = '';
+    onUserWorkstreamChange('');
     document.getElementById('userPasswordHint').textContent = 'required for new users';
     document.getElementById('userForceReset').checked = false;
     document.getElementById('userRole').value = 'dev';
   }
   document.getElementById('userModal').classList.remove('hidden');
+}
+
+function populateUserWorkstreamSelect() {
+  const sel = document.getElementById('userWorkstream'); if (!sel) return;
+  const list = DB.workstreams || [];
+  sel.innerHTML = '<option value="">— None —</option>' +
+    list.map(w => `<option value="${escapeAttr(w.name)}">${escapeHtml(w.name)}${w.dept?` (${escapeHtml(w.dept)})`:''}</option>`).join('');
+}
+
+function onUserWorkstreamChange(preselectDept) {
+  const wsName = document.getElementById('userWorkstream').value;
+  const deptSel = document.getElementById('userDept'); if (!deptSel) return;
+  // Departments derived from workstreams table.
+  let depts;
+  if (wsName) {
+    // Depts from all workstreams that share same dept(s) as selected workstream's dept,
+    // PLUS the selected workstream's own dept. In current schema each workstream has one dept,
+    // so we list distinct depts that match selected workstream's dept (typically one),
+    // and also expose all distinct depts for flexibility.
+    const ws = (DB.workstreams||[]).find(w => w.name === wsName);
+    const own = ws?.dept ? [ws.dept] : [];
+    const others = Array.from(new Set((DB.workstreams||[]).map(w=>w.dept).filter(Boolean)));
+    depts = Array.from(new Set([...own, ...others]));
+  } else {
+    depts = Array.from(new Set((DB.workstreams||[]).map(w=>w.dept).filter(Boolean)));
+  }
+  const placeholder = wsName ? '— Select department —' : '— Select workstream first —';
+  deptSel.innerHTML = `<option value="">${placeholder}</option>` +
+    depts.map(d => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`).join('');
+  // Pre-select: explicit value > selected workstream's own dept
+  const target = (preselectDept != null && preselectDept !== '') ? preselectDept :
+    ((DB.workstreams||[]).find(w => w.name === wsName)?.dept || '');
+  if (target) {
+    if (![...deptSel.options].some(o=>o.value===target)) {
+      const opt = document.createElement('option'); opt.value=target; opt.textContent=target; deptSel.appendChild(opt);
+    }
+    deptSel.value = target;
+  }
 }
 
 async function saveUser() {
