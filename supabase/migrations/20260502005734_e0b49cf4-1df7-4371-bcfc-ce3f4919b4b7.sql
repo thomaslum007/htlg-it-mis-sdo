@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.helpful_links_cap() FROM PUBLIC, anon, authenticated;
