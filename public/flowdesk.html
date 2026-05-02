@@ -1598,6 +1598,8 @@ async function initApp() {
   applyRoleVisibility();
   // Load custom dashboard layout (admin-editable, per-user)
   await loadDashLayout();
+  // Load helpful links into sidebar
+  await loadHelpfulLinks();
   // Default landing tab is Dashboard
   const dashNav = document.querySelector('.sidebar .nav-item');
   nav('dashboard', dashNav);
