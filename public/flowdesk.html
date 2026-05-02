@@ -1866,6 +1866,8 @@ function openAddWidgetModal(editId) {
   const existing = editId ? (dashState.layout||[]).find(w=>w.i===editId) : null;
   const cfg = existing ? existing.config || {} : {};
   const type = existing ? existing.type : 'kpi';
+  const fields = Array.isArray(cfg.fields) && cfg.fields.length ? cfg.fields : (cfg.field ? [cfg.field] : []);
+  const filterExpr = cfg.filterExpr != null ? cfg.filterExpr : (cfg.value ? '@'+cfg.value : '');
   const back = document.createElement('div'); back.className='modal-backdrop';
   back.innerHTML = `
     <div class="modal-card">
@@ -1887,32 +1889,143 @@ function openAddWidgetModal(editId) {
           <option value="sum" ${cfg.metric==='sum'?'selected':''}>Sum</option>
           <option value="distinct" ${cfg.metric==='distinct'?'selected':''}>Distinct Count</option>
         </select>
-        <label>Field (optional for total count)</label>
-        <select id="ww_field">
+        <label>Column field</label>
+        <select id="ww_field" onchange="ww_refreshSuggest()">
           <option value="">(none — total)</option>
           ${WIDGET_FIELDS.map(f=>`<option value="${f}" ${cfg.field===f?'selected':''}>${f}</option>`).join('')}
         </select>
-        <label>Filter to value (optional)</label>
-        <input id="ww_value" value="${escapeAttr(cfg.value||'')}" placeholder="e.g. In Progress"/>
+        <label>Filter expression — use <code>@value</code>, <code>AND</code>, <code>OR</code></label>
+        <input id="ww_value" value="${escapeAttr(filterExpr)}" placeholder="@In Progress OR @Review" oninput="ww_validateExpr()" onfocus="ww_showSuggest()" onblur="setTimeout(ww_hideSuggest,150)" autocomplete="off"/>
+        <div id="ww_suggest" class="ww-suggest" style="display:none"></div>
+        <div id="ww_validity" style="font-size:12px;margin-top:4px;"></div>
       </div>
       <div id="ww_chart_opts" style="display:none">
-        <label>Group by field</label>
-        <select id="ww_chart_field">
-          ${WIDGET_FIELDS.map(f=>`<option value="${f}" ${cfg.field===f?'selected':''}>${f}</option>`).join('')}
-        </select>
+        <label>Group by (one or more dimensions)</label>
+        <div id="ww_dim_chips" class="ww-chips"></div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+          <select id="ww_chart_field">
+            ${WIDGET_FIELDS.map(f=>`<option value="${f}">${f}</option>`).join('')}
+          </select>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="ww_addDim()">+ Add</button>
+        </div>
       </div>
       <div class="row-actions">
         <button class="btn btn-ghost btn-sm" onclick="this.closest('.modal-backdrop').remove()">Cancel</button>
-        <button class="btn btn-sm" style="background:var(--blue,#3b82f6);color:#fff" onclick="commitWidgetModal('${editId||''}')">${editId?'Save':'Add'}</button>
+        <button class="btn btn-sm" id="ww_save_btn" style="background:var(--blue,#3b82f6);color:#fff" onclick="commitWidgetModal('${editId||''}')">${editId?'Save':'Add'}</button>
       </div>
     </div>`;
   document.body.appendChild(back);
+  ww_dimState = fields.length ? fields.slice() : (type!=='kpi' ? ['status'] : []);
+  ww_renderDimChips();
   const sync = () => {
     const t = document.getElementById('ww_type').value;
     document.getElementById('ww_kpi_opts').style.display   = t==='kpi' ? '' : 'none';
     document.getElementById('ww_chart_opts').style.display = (t==='bar'||t==='pie'||t==='line') ? '' : 'none';
   };
   document.getElementById('ww_type').addEventListener('change', sync); sync();
+  ww_validateExpr();
+}
+
+// ---- Widget editor helpers (Fix 7) ----
+let ww_dimState = [];
+function ww_renderDimChips() {
+  const wrap = document.getElementById('ww_dim_chips'); if (!wrap) return;
+  wrap.innerHTML = ww_dimState.map((f,idx)=>`<span class="ww-chip">${escapeHtml(f)}<button type="button" onclick="ww_removeDim(${idx})">✕</button></span>`).join('') ||
+    '<span style="color:var(--text3);font-size:12px;">No dimensions selected.</span>';
+}
+function ww_addDim() {
+  const v = document.getElementById('ww_chart_field').value;
+  if (!v) return;
+  if (!ww_dimState.includes(v)) ww_dimState.push(v);
+  ww_renderDimChips();
+}
+function ww_removeDim(i) { ww_dimState.splice(i,1); ww_renderDimChips(); }
+function ww_fieldValues(field) {
+  if (!field) return [];
+  const set = new Set();
+  (DB.issues||[]).forEach(i => { const v = i[field]; if (v!=null && v!=='') set.add(String(v)); });
+  return Array.from(set).sort();
+}
+function ww_refreshSuggest() { ww_showSuggest(); ww_validateExpr(); }
+function ww_showSuggest() {
+  const field = document.getElementById('ww_field')?.value;
+  const wrap = document.getElementById('ww_suggest'); if (!wrap) return;
+  if (!field) { wrap.style.display='none'; return; }
+  const vals = ww_fieldValues(field);
+  if (!vals.length) { wrap.style.display='none'; return; }
+  wrap.innerHTML = vals.map(v=>`<button type="button" class="ww-suggest-item" onmousedown="ww_pickSuggest('${escapeAttr(v).replace(/'/g,'&#39;')}')">@${escapeHtml(v)}</button>`).join('');
+  wrap.style.display='';
+}
+function ww_hideSuggest() { const w=document.getElementById('ww_suggest'); if (w) w.style.display='none'; }
+function ww_pickSuggest(v) {
+  const inp = document.getElementById('ww_value'); if (!inp) return;
+  const cur = inp.value.trim();
+  const token = '@' + v;
+  inp.value = cur ? (cur + ' OR ' + token) : token;
+  ww_validateExpr(); inp.focus();
+}
+function ww_parseExpr(expr) {
+  const s = (expr||'').trim();
+  if (!s) return { ok:true, ast:null };
+  const tokens = []; let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (/\s/.test(c)) { i++; continue; }
+    if (c === '@') {
+      let j = i + 1;
+      while (j < s.length) {
+        const rest = s.slice(j);
+        if (/^\s+(AND|OR)\b/i.test(rest)) break;
+        j++;
+      }
+      const val = s.slice(i+1, j).trim();
+      if (!val) return { ok:false, error:'Empty value after @' };
+      tokens.push({ t:'val', v:val });
+      i = j;
+    } else {
+      const m = s.slice(i).match(/^(AND|OR)\b/i);
+      if (!m) return { ok:false, error:'Unexpected token near "'+s.slice(i,i+8)+'"' };
+      tokens.push({ t:'op', v: m[1].toUpperCase() });
+      i += m[1].length;
+    }
+  }
+  if (!tokens.length) return { ok:false, error:'Empty expression' };
+  if (tokens[0].t !== 'val') return { ok:false, error:'Expression must start with @value' };
+  for (let k=1; k<tokens.length; k++) {
+    if (k%2===1 && tokens[k].t !== 'op') return { ok:false, error:'Expected AND/OR' };
+    if (k%2===0 && tokens[k].t !== 'val') return { ok:false, error:'Expected @value' };
+  }
+  if (tokens[tokens.length-1].t !== 'val') return { ok:false, error:'Expression must end with @value' };
+  return { ok:true, ast: tokens };
+}
+function ww_evalExpr(ast, fieldValue) {
+  if (!ast) return true;
+  const groups = [[]];
+  for (let k=0; k<ast.length; k++) {
+    const tk = ast[k];
+    if (tk.t === 'val') groups[groups.length-1].push(tk.v);
+    else if (tk.v === 'OR') groups.push([]);
+  }
+  const fv = String(fieldValue ?? '');
+  return groups.some(g => g.every(v => fv === v));
+}
+function ww_validateExpr() {
+  const inp = document.getElementById('ww_value');
+  const out = document.getElementById('ww_validity');
+  const btn = document.getElementById('ww_save_btn');
+  if (!inp || !out) return true;
+  const r = ww_parseExpr(inp.value);
+  if (r.ok) {
+    out.innerHTML = '<span style="color:#10b981;">✅ Valid syntax</span>';
+    inp.style.borderColor = '';
+    if (btn) btn.disabled = false;
+    return true;
+  } else {
+    out.innerHTML = `<span style="color:#ef4444;">❌ ${escapeHtml(r.error)}</span>`;
+    inp.style.borderColor = '#ef4444';
+    if (btn) btn.disabled = true;
+    return false;
+  }
 }
 
 function commitWidgetModal(editId) {
@@ -1920,13 +2033,16 @@ function commitWidgetModal(editId) {
   const label = document.getElementById('ww_label').value.trim() || (t.toUpperCase()+' widget');
   let config = { label };
   if (t === 'kpi') {
+    if (!ww_validateExpr()) { toast('Fix the filter expression before saving.', 'error'); return; }
     config.metric = document.getElementById('ww_metric').value;
     config.field  = document.getElementById('ww_field').value;
-    config.value  = document.getElementById('ww_value').value.trim();
+    config.filterExpr = document.getElementById('ww_value').value.trim();
   } else if (t === 'table') {
     config.columns = ['key','title','status','priority','assignee'];
   } else {
-    config.field = document.getElementById('ww_chart_field').value;
+    if (!ww_dimState.length) { toast('Add at least one dimension.', 'error'); return; }
+    config.fields = ww_dimState.slice();
+    config.field = ww_dimState[0];
   }
   if (!dashState.layout) dashState.layout = [];
   if (editId) {
@@ -1938,6 +2054,7 @@ function commitWidgetModal(editId) {
   }
   document.querySelector('.modal-backdrop')?.remove();
   renderDashboard();
+  if (typeof saveDashLayout === 'function') saveDashLayout();
 }
 
 function renderStatusChart(issues) {
