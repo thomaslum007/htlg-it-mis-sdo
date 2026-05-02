@@ -493,6 +493,16 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
       <div class="nav-label">Config</div>
       <button class="nav-item" onclick="nav('settings',this)"><span class="icon">⚙️</span><span>Settings</span></button>
     </div>
+    <div class="nav-section" id="helpfulLinksSection">
+      <div class="nav-label" style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+        <button type="button" class="hl-toggle" onclick="toggleHelpfulLinks()" aria-expanded="false" style="background:none;border:0;color:inherit;font:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:0;">
+          <span id="hlChevron" style="transition:transform .15s;">▸</span>
+          <span>Helpful Links</span>
+        </button>
+        <button type="button" id="hlEditBtn" class="hl-edit" onclick="openHelpfulLinksEditor()" title="Edit links" style="display:none;background:none;border:0;color:var(--text2);cursor:pointer;font-size:12px;padding:2px 4px;">✎</button>
+      </div>
+      <div id="helpfulLinksList" class="hl-list" style="display:none;"></div>
+    </div>
   </div>
   <div class="sidebar-footer">
     <div class="user-card" onclick="nav('settings',document.querySelector('.nav-item:last-child'))">
