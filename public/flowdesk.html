@@ -152,6 +152,21 @@ body.login-mode { display: block; }
 .modal-card label { display:block; font-size:11px; color:var(--text2,#9090a8); text-transform:uppercase; letter-spacing:.04em; margin:10px 0 4px; }
 .modal-card select, .modal-card input { width:100%; background:var(--bg2,#1a1a24); color:var(--text,#e6e6f0); border:1px solid var(--border,#2a2a38); border-radius:6px; padding:8px 10px; font-family:var(--font,inherit); font-size:13px; }
 .modal-card .row-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+.ww-suggest { max-height:140px; overflow:auto; border:1px solid var(--border,#2a2a38); border-radius:6px; margin-top:4px; background:var(--bg2,#1a1a24); padding:4px; display:flex; flex-wrap:wrap; gap:4px; }
+.ww-suggest-item { background:var(--surface2,#22222e); color:var(--text,#e6e6f0); border:1px solid var(--border,#2a2a38); border-radius:999px; padding:3px 8px; font-size:12px; cursor:pointer; }
+.ww-suggest-item:hover { background:var(--accent,#3b82f6); color:#fff; border-color:transparent; }
+.ww-chips { display:flex; flex-wrap:wrap; gap:6px; min-height:24px; }
+.ww-chip { display:inline-flex; align-items:center; gap:4px; background:var(--accent-glow,rgba(59,130,246,.15)); color:var(--accent2,#3b82f6); border:1px solid var(--accent,#3b82f6); border-radius:999px; padding:2px 8px; font-size:12px; }
+.ww-chip button { background:transparent; border:0; color:inherit; cursor:pointer; font-size:12px; line-height:1; padding:0; }
+/* Helpful Links sidebar */
+.hl-list { display:flex; flex-direction:column; gap:2px; margin-top:6px; max-height:240px; overflow:auto; }
+.hl-item { display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:var(--radius); color:var(--text2); font-size:12px; text-decoration:none; transition:all .15s; }
+.hl-item:hover { background:var(--surface2); color:var(--text); }
+.hl-empty { color:var(--text3); font-size:12px; padding:6px 10px; font-style:italic; }
+body.sidebar-collapsed #helpfulLinksSection { display:none; }
+/* Helpful Links editor rows */
+.hl-row { display:grid; grid-template-columns: 1fr 1.4fr auto; gap:6px; align-items:center; margin-bottom:6px; }
+.hl-row input { width:100%; }
 
 /* Badges / Status */
 .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; font-family: var(--mono); white-space: nowrap; }
@@ -486,6 +501,16 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
     <div class="nav-section">
       <div class="nav-label">Config</div>
       <button class="nav-item" onclick="nav('settings',this)"><span class="icon">⚙️</span><span>Settings</span></button>
+    </div>
+    <div class="nav-section" id="helpfulLinksSection">
+      <div class="nav-label" style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+        <button type="button" class="hl-toggle" onclick="toggleHelpfulLinks()" aria-expanded="false" style="background:none;border:0;color:inherit;font:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:0;">
+          <span id="hlChevron" style="transition:transform .15s;">▸</span>
+          <span>Helpful Links</span>
+        </button>
+        <button type="button" id="hlEditBtn" class="hl-edit" onclick="openHelpfulLinksEditor()" title="Edit links" style="display:none;background:none;border:0;color:var(--text2);cursor:pointer;font-size:12px;padding:2px 4px;">✎</button>
+      </div>
+      <div id="helpfulLinksList" class="hl-list" style="display:none;"></div>
     </div>
   </div>
   <div class="sidebar-footer">
@@ -849,8 +874,14 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
           </select>
         </div>
         <div class="form-group">
+          <label>Workstream</label>
+          <select id="userWorkstream" onchange="onUserWorkstreamChange()"><option value="">— None —</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
           <label>Department</label>
-          <input type="text" id="userDept" placeholder="e.g. Engineering">
+          <select id="userDept"><option value="">— Select workstream first —</option></select>
         </div>
       </div>
       <div class="form-group">
@@ -983,7 +1014,7 @@ const Cloud = {
     if (map.dashboard_segments)        DB.dashboardSegments = map.dashboard_segments;
   },
   mapProfileFromDB(r, role) {
-    return { id: r.id, name: r.name||'', username: r.username||'', email: r.email||'', role: role||'viewer', dept: r.dept||'', responsibilities: r.responsibilities||'', avatarColor: r.avatar_color, forcePasswordReset: !!r.force_password_reset };
+    return { id: r.id, name: r.name||'', username: r.username||'', email: r.email||'', role: role||'viewer', dept: r.dept||'', workstream: r.workstream||'', responsibilities: r.responsibilities||'', avatarColor: r.avatar_color, forcePasswordReset: !!r.force_password_reset };
   },
   mapWsFromDB(r) { return { id: r.id, name: r.name, dept: r.dept||'', desc: r.description||'', color: r.color||'#6c63ff' }; },
   mapIssueFromDB(r) {
@@ -1576,6 +1607,8 @@ async function initApp() {
   applyRoleVisibility();
   // Load custom dashboard layout (admin-editable, per-user)
   await loadDashLayout();
+  // Load helpful links into sidebar
+  await loadHelpfulLinks();
   // Default landing tab is Dashboard
   const dashNav = document.querySelector('.sidebar .nav-item');
   nav('dashboard', dashNav);
@@ -1808,9 +1841,16 @@ function renderWidget(w, issues) {
   if (w.type === 'kpi') {
     let val = 0;
     let pool = data;
-    if (cfg.field && cfg.value) pool = data.filter(i => String(i[cfg.field]||'') === cfg.value);
+    if (cfg.field) {
+      // Prefer expression; fallback to legacy `value`
+      const expr = cfg.filterExpr != null ? cfg.filterExpr : (cfg.value ? '@'+cfg.value : '');
+      const r = ww_parseExpr(expr);
+      if (r.ok && r.ast) {
+        pool = data.filter(i => ww_evalExpr(r.ast, i[cfg.field]));
+      }
+    }
     if (cfg.metric === 'distinct' && cfg.field) {
-      val = new Set(data.map(i => i[cfg.field]).filter(Boolean)).size;
+      val = new Set(pool.map(i => i[cfg.field]).filter(Boolean)).size;
     } else if (cfg.metric === 'sum' && cfg.field) {
       val = pool.reduce((s,i)=> s + (Number(i[cfg.field])||0), 0);
     } else { // count
@@ -1826,9 +1866,12 @@ function renderWidget(w, issues) {
     return;
   }
   // chart types: bar / pie / line
-  const field = cfg.field || 'status';
+  const fields = (Array.isArray(cfg.fields) && cfg.fields.length) ? cfg.fields : [cfg.field || 'status'];
   const groups = {};
-  data.forEach(i => { const k = i[field] || '—'; groups[k] = (groups[k]||0) + 1; });
+  data.forEach(i => {
+    const k = fields.map(f => i[f] || '—').join(' / ');
+    groups[k] = (groups[k]||0) + 1;
+  });
   const labels = Object.keys(groups);
   const values = labels.map(k => groups[k]);
   const palette = ['#3b82f6','#06d6a0','#ffd166','#ff8c42','#ff4d4d','#a78bfa','#22d3ee','#f472b6'];
@@ -1860,6 +1903,8 @@ function openAddWidgetModal(editId) {
   const existing = editId ? (dashState.layout||[]).find(w=>w.i===editId) : null;
   const cfg = existing ? existing.config || {} : {};
   const type = existing ? existing.type : 'kpi';
+  const fields = Array.isArray(cfg.fields) && cfg.fields.length ? cfg.fields : (cfg.field ? [cfg.field] : []);
+  const filterExpr = cfg.filterExpr != null ? cfg.filterExpr : (cfg.value ? '@'+cfg.value : '');
   const back = document.createElement('div'); back.className='modal-backdrop';
   back.innerHTML = `
     <div class="modal-card">
@@ -1881,32 +1926,143 @@ function openAddWidgetModal(editId) {
           <option value="sum" ${cfg.metric==='sum'?'selected':''}>Sum</option>
           <option value="distinct" ${cfg.metric==='distinct'?'selected':''}>Distinct Count</option>
         </select>
-        <label>Field (optional for total count)</label>
-        <select id="ww_field">
+        <label>Column field</label>
+        <select id="ww_field" onchange="ww_refreshSuggest()">
           <option value="">(none — total)</option>
           ${WIDGET_FIELDS.map(f=>`<option value="${f}" ${cfg.field===f?'selected':''}>${f}</option>`).join('')}
         </select>
-        <label>Filter to value (optional)</label>
-        <input id="ww_value" value="${escapeAttr(cfg.value||'')}" placeholder="e.g. In Progress"/>
+        <label>Filter expression — use <code>@value</code>, <code>AND</code>, <code>OR</code></label>
+        <input id="ww_value" value="${escapeAttr(filterExpr)}" placeholder="@In Progress OR @Review" oninput="ww_validateExpr()" onfocus="ww_showSuggest()" onblur="setTimeout(ww_hideSuggest,150)" autocomplete="off"/>
+        <div id="ww_suggest" class="ww-suggest" style="display:none"></div>
+        <div id="ww_validity" style="font-size:12px;margin-top:4px;"></div>
       </div>
       <div id="ww_chart_opts" style="display:none">
-        <label>Group by field</label>
-        <select id="ww_chart_field">
-          ${WIDGET_FIELDS.map(f=>`<option value="${f}" ${cfg.field===f?'selected':''}>${f}</option>`).join('')}
-        </select>
+        <label>Group by (one or more dimensions)</label>
+        <div id="ww_dim_chips" class="ww-chips"></div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+          <select id="ww_chart_field">
+            ${WIDGET_FIELDS.map(f=>`<option value="${f}">${f}</option>`).join('')}
+          </select>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="ww_addDim()">+ Add</button>
+        </div>
       </div>
       <div class="row-actions">
         <button class="btn btn-ghost btn-sm" onclick="this.closest('.modal-backdrop').remove()">Cancel</button>
-        <button class="btn btn-sm" style="background:var(--blue,#3b82f6);color:#fff" onclick="commitWidgetModal('${editId||''}')">${editId?'Save':'Add'}</button>
+        <button class="btn btn-sm" id="ww_save_btn" style="background:var(--blue,#3b82f6);color:#fff" onclick="commitWidgetModal('${editId||''}')">${editId?'Save':'Add'}</button>
       </div>
     </div>`;
   document.body.appendChild(back);
+  ww_dimState = fields.length ? fields.slice() : (type!=='kpi' ? ['status'] : []);
+  ww_renderDimChips();
   const sync = () => {
     const t = document.getElementById('ww_type').value;
     document.getElementById('ww_kpi_opts').style.display   = t==='kpi' ? '' : 'none';
     document.getElementById('ww_chart_opts').style.display = (t==='bar'||t==='pie'||t==='line') ? '' : 'none';
   };
   document.getElementById('ww_type').addEventListener('change', sync); sync();
+  ww_validateExpr();
+}
+
+// ---- Widget editor helpers (Fix 7) ----
+let ww_dimState = [];
+function ww_renderDimChips() {
+  const wrap = document.getElementById('ww_dim_chips'); if (!wrap) return;
+  wrap.innerHTML = ww_dimState.map((f,idx)=>`<span class="ww-chip">${escapeHtml(f)}<button type="button" onclick="ww_removeDim(${idx})">✕</button></span>`).join('') ||
+    '<span style="color:var(--text3);font-size:12px;">No dimensions selected.</span>';
+}
+function ww_addDim() {
+  const v = document.getElementById('ww_chart_field').value;
+  if (!v) return;
+  if (!ww_dimState.includes(v)) ww_dimState.push(v);
+  ww_renderDimChips();
+}
+function ww_removeDim(i) { ww_dimState.splice(i,1); ww_renderDimChips(); }
+function ww_fieldValues(field) {
+  if (!field) return [];
+  const set = new Set();
+  (DB.issues||[]).forEach(i => { const v = i[field]; if (v!=null && v!=='') set.add(String(v)); });
+  return Array.from(set).sort();
+}
+function ww_refreshSuggest() { ww_showSuggest(); ww_validateExpr(); }
+function ww_showSuggest() {
+  const field = document.getElementById('ww_field')?.value;
+  const wrap = document.getElementById('ww_suggest'); if (!wrap) return;
+  if (!field) { wrap.style.display='none'; return; }
+  const vals = ww_fieldValues(field);
+  if (!vals.length) { wrap.style.display='none'; return; }
+  wrap.innerHTML = vals.map(v=>`<button type="button" class="ww-suggest-item" onmousedown="ww_pickSuggest('${escapeAttr(v).replace(/'/g,'&#39;')}')">@${escapeHtml(v)}</button>`).join('');
+  wrap.style.display='';
+}
+function ww_hideSuggest() { const w=document.getElementById('ww_suggest'); if (w) w.style.display='none'; }
+function ww_pickSuggest(v) {
+  const inp = document.getElementById('ww_value'); if (!inp) return;
+  const cur = inp.value.trim();
+  const token = '@' + v;
+  inp.value = cur ? (cur + ' OR ' + token) : token;
+  ww_validateExpr(); inp.focus();
+}
+function ww_parseExpr(expr) {
+  const s = (expr||'').trim();
+  if (!s) return { ok:true, ast:null };
+  const tokens = []; let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (/\s/.test(c)) { i++; continue; }
+    if (c === '@') {
+      let j = i + 1;
+      while (j < s.length) {
+        const rest = s.slice(j);
+        if (/^\s+(AND|OR)\b/i.test(rest)) break;
+        j++;
+      }
+      const val = s.slice(i+1, j).trim();
+      if (!val) return { ok:false, error:'Empty value after @' };
+      tokens.push({ t:'val', v:val });
+      i = j;
+    } else {
+      const m = s.slice(i).match(/^(AND|OR)\b/i);
+      if (!m) return { ok:false, error:'Unexpected token near "'+s.slice(i,i+8)+'"' };
+      tokens.push({ t:'op', v: m[1].toUpperCase() });
+      i += m[1].length;
+    }
+  }
+  if (!tokens.length) return { ok:false, error:'Empty expression' };
+  if (tokens[0].t !== 'val') return { ok:false, error:'Expression must start with @value' };
+  for (let k=1; k<tokens.length; k++) {
+    if (k%2===1 && tokens[k].t !== 'op') return { ok:false, error:'Expected AND/OR' };
+    if (k%2===0 && tokens[k].t !== 'val') return { ok:false, error:'Expected @value' };
+  }
+  if (tokens[tokens.length-1].t !== 'val') return { ok:false, error:'Expression must end with @value' };
+  return { ok:true, ast: tokens };
+}
+function ww_evalExpr(ast, fieldValue) {
+  if (!ast) return true;
+  const groups = [[]];
+  for (let k=0; k<ast.length; k++) {
+    const tk = ast[k];
+    if (tk.t === 'val') groups[groups.length-1].push(tk.v);
+    else if (tk.v === 'OR') groups.push([]);
+  }
+  const fv = String(fieldValue ?? '');
+  return groups.some(g => g.every(v => fv === v));
+}
+function ww_validateExpr() {
+  const inp = document.getElementById('ww_value');
+  const out = document.getElementById('ww_validity');
+  const btn = document.getElementById('ww_save_btn');
+  if (!inp || !out) return true;
+  const r = ww_parseExpr(inp.value);
+  if (r.ok) {
+    out.innerHTML = '<span style="color:#10b981;">✅ Valid syntax</span>';
+    inp.style.borderColor = '';
+    if (btn) btn.disabled = false;
+    return true;
+  } else {
+    out.innerHTML = `<span style="color:#ef4444;">❌ ${escapeHtml(r.error)}</span>`;
+    inp.style.borderColor = '#ef4444';
+    if (btn) btn.disabled = true;
+    return false;
+  }
 }
 
 function commitWidgetModal(editId) {
@@ -1914,13 +2070,16 @@ function commitWidgetModal(editId) {
   const label = document.getElementById('ww_label').value.trim() || (t.toUpperCase()+' widget');
   let config = { label };
   if (t === 'kpi') {
+    if (!ww_validateExpr()) { toast('Fix the filter expression before saving.', 'error'); return; }
     config.metric = document.getElementById('ww_metric').value;
     config.field  = document.getElementById('ww_field').value;
-    config.value  = document.getElementById('ww_value').value.trim();
+    config.filterExpr = document.getElementById('ww_value').value.trim();
   } else if (t === 'table') {
     config.columns = ['key','title','status','priority','assignee'];
   } else {
-    config.field = document.getElementById('ww_chart_field').value;
+    if (!ww_dimState.length) { toast('Add at least one dimension.', 'error'); return; }
+    config.fields = ww_dimState.slice();
+    config.field = ww_dimState[0];
   }
   if (!dashState.layout) dashState.layout = [];
   if (editId) {
@@ -1932,6 +2091,7 @@ function commitWidgetModal(editId) {
   }
   document.querySelector('.modal-backdrop')?.remove();
   renderDashboard();
+  if (typeof saveDashLayout === 'function') saveDashLayout();
 }
 
 function renderStatusChart(issues) {
@@ -2573,6 +2733,7 @@ function renderUsers() {
 function openUserModal(id) {
   if (currentUser?.role !== 'admin') { toast('Only admins can manage users.', 'error'); return; }
   editingUserId = id || null;
+  populateUserWorkstreamSelect();
   if (id) {
     const u = DB.users.find(x=>x.id===id);
     document.getElementById('userModalTitle').textContent = 'Edit User';
@@ -2585,17 +2746,58 @@ function openUserModal(id) {
     document.getElementById('userPasswordHint').textContent = 'optional: enter to reset password';
     document.getElementById('userForceReset').checked = !!u.forcePasswordReset;
     document.getElementById('userRole').value = u.role;
-    document.getElementById('userDept').value = u.dept||'';
+    document.getElementById('userWorkstream').value = u.workstream||'';
+    onUserWorkstreamChange(u.dept||'');
     document.getElementById('userResponsibilities').value = u.responsibilities||'';
   } else {
     document.getElementById('userModalTitle').textContent = 'Add User';
     document.getElementById('userId').value = '';
-    ['userName','userUsername','userEmail','userPassword','userPasswordConfirm','userDept','userResponsibilities'].forEach(id=>document.getElementById(id).value='');
+    ['userName','userUsername','userEmail','userPassword','userPasswordConfirm','userResponsibilities'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('userWorkstream').value = '';
+    onUserWorkstreamChange('');
     document.getElementById('userPasswordHint').textContent = 'required for new users';
     document.getElementById('userForceReset').checked = false;
     document.getElementById('userRole').value = 'dev';
   }
   document.getElementById('userModal').classList.remove('hidden');
+}
+
+function populateUserWorkstreamSelect() {
+  const sel = document.getElementById('userWorkstream'); if (!sel) return;
+  const list = DB.workstreams || [];
+  sel.innerHTML = '<option value="">— None —</option>' +
+    list.map(w => `<option value="${escapeAttr(w.name)}">${escapeHtml(w.name)}${w.dept?` (${escapeHtml(w.dept)})`:''}</option>`).join('');
+}
+
+function onUserWorkstreamChange(preselectDept) {
+  const wsName = document.getElementById('userWorkstream').value;
+  const deptSel = document.getElementById('userDept'); if (!deptSel) return;
+  // Departments derived from workstreams table.
+  let depts;
+  if (wsName) {
+    // Depts from all workstreams that share same dept(s) as selected workstream's dept,
+    // PLUS the selected workstream's own dept. In current schema each workstream has one dept,
+    // so we list distinct depts that match selected workstream's dept (typically one),
+    // and also expose all distinct depts for flexibility.
+    const ws = (DB.workstreams||[]).find(w => w.name === wsName);
+    const own = ws?.dept ? [ws.dept] : [];
+    const others = Array.from(new Set((DB.workstreams||[]).map(w=>w.dept).filter(Boolean)));
+    depts = Array.from(new Set([...own, ...others]));
+  } else {
+    depts = Array.from(new Set((DB.workstreams||[]).map(w=>w.dept).filter(Boolean)));
+  }
+  const placeholder = wsName ? '— Select department —' : '— Select workstream first —';
+  deptSel.innerHTML = `<option value="">${placeholder}</option>` +
+    depts.map(d => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`).join('');
+  // Pre-select: explicit value > selected workstream's own dept
+  const target = (preselectDept != null && preselectDept !== '') ? preselectDept :
+    ((DB.workstreams||[]).find(w => w.name === wsName)?.dept || '');
+  if (target) {
+    if (![...deptSel.options].some(o=>o.value===target)) {
+      const opt = document.createElement('option'); opt.value=target; opt.textContent=target; deptSel.appendChild(opt);
+    }
+    deptSel.value = target;
+  }
 }
 
 async function saveUser() {
@@ -2610,7 +2812,9 @@ async function saveUser() {
   if (password !== confirmPassword) { toast('Passwords do not match','error'); return; }
   const data = {
     name, username, email, password, role: document.getElementById('userRole').value,
-    dept: document.getElementById('userDept').value, responsibilities: document.getElementById('userResponsibilities').value,
+    dept: document.getElementById('userDept').value,
+    workstream: document.getElementById('userWorkstream').value,
+    responsibilities: document.getElementById('userResponsibilities').value,
     forcePasswordReset: document.getElementById('userForceReset').checked
   };
   if (editingUserId) {
@@ -2961,6 +3165,157 @@ function toggleTheme() {
     const btn = document.getElementById('themeToggleBtn');
     if (btn) btn.textContent = document.body.classList.contains('theme-light') ? '☀️' : '🌙';
   });
+})();
+
+// ====== HELPFUL LINKS (Fix 9) ======
+const HL_KEY = 'flowdesk_hl_open';
+let HL_DATA = [];
+
+async function loadHelpfulLinks() {
+  try {
+    const sb = await Cloud.waitForClient();
+    const { data, error } = await sb.from('helpful_links').select('*').order('order', { ascending: true }).order('created_at', { ascending: true });
+    if (error) { console.error('helpful_links load', error); HL_DATA = []; }
+    else HL_DATA = data || [];
+  } catch (e) { console.error(e); HL_DATA = []; }
+  renderHelpfulLinks();
+  // Restore open state
+  try {
+    if (localStorage.getItem(HL_KEY) === '1') setHelpfulLinksOpen(true);
+    else setHelpfulLinksOpen(false);
+  } catch(_) {}
+  // Show edit button only for admin
+  const btn = document.getElementById('hlEditBtn');
+  if (btn) btn.style.display = (currentUser?.role === 'admin') ? '' : 'none';
+}
+
+function renderHelpfulLinks() {
+  const list = document.getElementById('helpfulLinksList'); if (!list) return;
+  if (!HL_DATA.length) { list.innerHTML = '<div class="hl-empty">No links added yet</div>'; return; }
+  list.innerHTML = HL_DATA.map(l =>
+    `<a class="hl-item" href="${escapeAttr(l.url)}" target="_blank" rel="noopener noreferrer" title="${escapeAttr(l.url)}"><span class="icon">🔗</span><span>${escapeHtml(l.title || l.url)}</span></a>`
+  ).join('');
+}
+
+function setHelpfulLinksOpen(open) {
+  const list = document.getElementById('helpfulLinksList');
+  const chev = document.getElementById('hlChevron');
+  const toggle = document.querySelector('.hl-toggle');
+  if (list) list.style.display = open ? '' : 'none';
+  if (chev) chev.style.transform = open ? 'rotate(90deg)' : '';
+  if (toggle) toggle.setAttribute('aria-expanded', String(open));
+}
+
+function toggleHelpfulLinks() {
+  const list = document.getElementById('helpfulLinksList');
+  const open = list && list.style.display === 'none';
+  setHelpfulLinksOpen(open);
+  try { localStorage.setItem(HL_KEY, open ? '1' : '0'); } catch(_) {}
+}
+
+function openHelpfulLinksEditor() {
+  if (currentUser?.role !== 'admin') { toast('Only admins can edit links.', 'error'); return; }
+  const back = document.createElement('div'); back.className = 'modal-backdrop';
+  // Working copy
+  const draft = HL_DATA.map(l => ({ id: l.id, title: l.title || '', url: l.url || '' }));
+  back.innerHTML = `
+    <div class="modal-card" style="width:min(560px,94vw);">
+      <h3>Edit Helpful Links <span style="font-weight:400;color:var(--text3);font-size:12px;">(max 20)</span></h3>
+      <div id="hlEditRows"></div>
+      <button type="button" class="btn btn-ghost btn-sm" id="hlAddRowBtn" style="margin-top:6px;">+ Add Link</button>
+      <div id="hlEditError" style="color:#ef4444;font-size:12px;margin-top:8px;"></div>
+      <div class="row-actions">
+        <button class="btn btn-ghost btn-sm" onclick="this.closest('.modal-backdrop').remove()">Cancel</button>
+        <button class="btn btn-sm" id="hlSaveBtn" style="background:var(--blue,#3b82f6);color:#fff">Save</button>
+      </div>
+    </div>`;
+  document.body.appendChild(back);
+
+  const rowsWrap = back.querySelector('#hlEditRows');
+  const errBox = back.querySelector('#hlEditError');
+  const renderRows = () => {
+    rowsWrap.innerHTML = draft.map((r,idx)=>`
+      <div class="hl-row" data-idx="${idx}">
+        <input data-k="title" placeholder="Title" value="${escapeAttr(r.title)}">
+        <input data-k="url" placeholder="https://example.com" value="${escapeAttr(r.url)}">
+        <button type="button" class="btn btn-ghost btn-sm" data-action="del">✕</button>
+      </div>
+    `).join('') || '<div style="color:var(--text3);font-size:12px;">No links yet. Click "+ Add Link".</div>';
+    rowsWrap.querySelectorAll('input').forEach(inp=>{
+      inp.oninput = () => {
+        const idx = +inp.closest('.hl-row').dataset.idx;
+        draft[idx][inp.dataset.k] = inp.value;
+      };
+    });
+    rowsWrap.querySelectorAll('[data-action="del"]').forEach(btn=>{
+      btn.onclick = () => {
+        const idx = +btn.closest('.hl-row').dataset.idx;
+        if (!confirm('Remove this link?')) return;
+        draft.splice(idx,1); renderRows();
+      };
+    });
+  };
+  renderRows();
+
+  back.querySelector('#hlAddRowBtn').onclick = () => {
+    if (draft.length >= 20) { errBox.textContent = 'Maximum of 20 links allowed.'; return; }
+    draft.push({ id:null, title:'', url:'' });
+    renderRows();
+  };
+
+  back.querySelector('#hlSaveBtn').onclick = async () => {
+    errBox.textContent = '';
+    // Validate
+    for (let i=0;i<draft.length;i++) {
+      const r = draft[i];
+      if (!r.title.trim() || !r.url.trim()) { errBox.textContent = `Row ${i+1}: title and URL are required.`; return; }
+      try { new URL(r.url); } catch(_) { errBox.textContent = `Row ${i+1}: invalid URL.`; return; }
+    }
+    if (draft.length > 20) { errBox.textContent = 'Maximum of 20 links.'; return; }
+    try {
+      const sb = await Cloud.waitForClient();
+      // Diff: delete removed, upsert remaining (with order)
+      const oldIds = new Set(HL_DATA.map(l => l.id));
+      const keepIds = new Set(draft.filter(r=>r.id).map(r=>r.id));
+      const toDelete = [...oldIds].filter(id => !keepIds.has(id));
+      if (toDelete.length) {
+        const { error: delErr } = await sb.from('helpful_links').delete().in('id', toDelete);
+        if (delErr) throw delErr;
+      }
+      // Upsert each with order
+      for (let i=0;i<draft.length;i++) {
+        const r = draft[i];
+        const row = { title: r.title.trim(), url: r.url.trim(), order: i };
+        if (r.id) {
+          const { error } = await sb.from('helpful_links').update(row).eq('id', r.id);
+          if (error) throw error;
+        } else {
+          const { error } = await sb.from('helpful_links').insert(row);
+          if (error) throw error;
+        }
+      }
+      back.remove();
+      await loadHelpfulLinks();
+      toast('Links saved', 'success');
+    } catch (e) {
+      console.error(e);
+      errBox.textContent = e.message || 'Save failed';
+      toast('Could not save links', 'error');
+    }
+  };
+}
+</script>
+<script>
+// Hook into role visibility refresh: ensure HL edit button reflects current role.
+(function(){
+  const orig = window.applyRoleVisibility;
+  if (typeof orig === 'function') {
+    window.applyRoleVisibility = function(){
+      orig.apply(this, arguments);
+      const btn = document.getElementById('hlEditBtn');
+      if (btn) btn.style.display = (window.currentUser?.role === 'admin') ? '' : 'none';
+    };
+  }
 })();
 </script>
 </body>

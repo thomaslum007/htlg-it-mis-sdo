@@ -68,6 +68,33 @@ export type Database = {
         }
         Relationships: []
       }
+      helpful_links: {
+        Row: {
+          created_at: string
+          id: string
+          order: number
+          title: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order?: number
+          title: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order?: number
+          title?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
       issues: {
         Row: {
           assignee: string | null
@@ -140,6 +167,7 @@ export type Database = {
           responsibilities: string | null
           updated_at: string
           username: string | null
+          workstream: string | null
         }
         Insert: {
           avatar_color?: string | null
@@ -152,6 +180,7 @@ export type Database = {
           responsibilities?: string | null
           updated_at?: string
           username?: string | null
+          workstream?: string | null
         }
         Update: {
           avatar_color?: string | null
@@ -164,6 +193,7 @@ export type Database = {
           responsibilities?: string | null
           updated_at?: string
           username?: string | null
+          workstream?: string | null
         }
         Relationships: []
       }
