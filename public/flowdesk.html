@@ -3166,6 +3166,157 @@ function toggleTheme() {
     if (btn) btn.textContent = document.body.classList.contains('theme-light') ? '☀️' : '🌙';
   });
 })();
+
+// ====== HELPFUL LINKS (Fix 9) ======
+const HL_KEY = 'flowdesk_hl_open';
+let HL_DATA = [];
+
+async function loadHelpfulLinks() {
+  try {
+    const sb = await Cloud.waitForClient();
+    const { data, error } = await sb.from('helpful_links').select('*').order('order', { ascending: true }).order('created_at', { ascending: true });
+    if (error) { console.error('helpful_links load', error); HL_DATA = []; }
+    else HL_DATA = data || [];
+  } catch (e) { console.error(e); HL_DATA = []; }
+  renderHelpfulLinks();
+  // Restore open state
+  try {
+    if (localStorage.getItem(HL_KEY) === '1') setHelpfulLinksOpen(true);
+    else setHelpfulLinksOpen(false);
+  } catch(_) {}
+  // Show edit button only for admin
+  const btn = document.getElementById('hlEditBtn');
+  if (btn) btn.style.display = (currentUser?.role === 'admin') ? '' : 'none';
+}
+
+function renderHelpfulLinks() {
+  const list = document.getElementById('helpfulLinksList'); if (!list) return;
+  if (!HL_DATA.length) { list.innerHTML = '<div class="hl-empty">No links added yet</div>'; return; }
+  list.innerHTML = HL_DATA.map(l =>
+    `<a class="hl-item" href="${escapeAttr(l.url)}" target="_blank" rel="noopener noreferrer" title="${escapeAttr(l.url)}"><span class="icon">🔗</span><span>${escapeHtml(l.title || l.url)}</span></a>`
+  ).join('');
+}
+
+function setHelpfulLinksOpen(open) {
+  const list = document.getElementById('helpfulLinksList');
+  const chev = document.getElementById('hlChevron');
+  const toggle = document.querySelector('.hl-toggle');
+  if (list) list.style.display = open ? '' : 'none';
+  if (chev) chev.style.transform = open ? 'rotate(90deg)' : '';
+  if (toggle) toggle.setAttribute('aria-expanded', String(open));
+}
+
+function toggleHelpfulLinks() {
+  const list = document.getElementById('helpfulLinksList');
+  const open = list && list.style.display === 'none';
+  setHelpfulLinksOpen(open);
+  try { localStorage.setItem(HL_KEY, open ? '1' : '0'); } catch(_) {}
+}
+
+function openHelpfulLinksEditor() {
+  if (currentUser?.role !== 'admin') { toast('Only admins can edit links.', 'error'); return; }
+  const back = document.createElement('div'); back.className = 'modal-backdrop';
+  // Working copy
+  const draft = HL_DATA.map(l => ({ id: l.id, title: l.title || '', url: l.url || '' }));
+  back.innerHTML = `
+    <div class="modal-card" style="width:min(560px,94vw);">
+      <h3>Edit Helpful Links <span style="font-weight:400;color:var(--text3);font-size:12px;">(max 20)</span></h3>
+      <div id="hlEditRows"></div>
+      <button type="button" class="btn btn-ghost btn-sm" id="hlAddRowBtn" style="margin-top:6px;">+ Add Link</button>
+      <div id="hlEditError" style="color:#ef4444;font-size:12px;margin-top:8px;"></div>
+      <div class="row-actions">
+        <button class="btn btn-ghost btn-sm" onclick="this.closest('.modal-backdrop').remove()">Cancel</button>
+        <button class="btn btn-sm" id="hlSaveBtn" style="background:var(--blue,#3b82f6);color:#fff">Save</button>
+      </div>
+    </div>`;
+  document.body.appendChild(back);
+
+  const rowsWrap = back.querySelector('#hlEditRows');
+  const errBox = back.querySelector('#hlEditError');
+  const renderRows = () => {
+    rowsWrap.innerHTML = draft.map((r,idx)=>`
+      <div class="hl-row" data-idx="${idx}">
+        <input data-k="title" placeholder="Title" value="${escapeAttr(r.title)}">
+        <input data-k="url" placeholder="https://example.com" value="${escapeAttr(r.url)}">
+        <button type="button" class="btn btn-ghost btn-sm" data-action="del">✕</button>
+      </div>
+    `).join('') || '<div style="color:var(--text3);font-size:12px;">No links yet. Click "+ Add Link".</div>';
+    rowsWrap.querySelectorAll('input').forEach(inp=>{
+      inp.oninput = () => {
+        const idx = +inp.closest('.hl-row').dataset.idx;
+        draft[idx][inp.dataset.k] = inp.value;
+      };
+    });
+    rowsWrap.querySelectorAll('[data-action="del"]').forEach(btn=>{
+      btn.onclick = () => {
+        const idx = +btn.closest('.hl-row').dataset.idx;
+        if (!confirm('Remove this link?')) return;
+        draft.splice(idx,1); renderRows();
+      };
+    });
+  };
+  renderRows();
+
+  back.querySelector('#hlAddRowBtn').onclick = () => {
+    if (draft.length >= 20) { errBox.textContent = 'Maximum of 20 links allowed.'; return; }
+    draft.push({ id:null, title:'', url:'' });
+    renderRows();
+  };
+
+  back.querySelector('#hlSaveBtn').onclick = async () => {
+    errBox.textContent = '';
+    // Validate
+    for (let i=0;i<draft.length;i++) {
+      const r = draft[i];
+      if (!r.title.trim() || !r.url.trim()) { errBox.textContent = `Row ${i+1}: title and URL are required.`; return; }
+      try { new URL(r.url); } catch(_) { errBox.textContent = `Row ${i+1}: invalid URL.`; return; }
+    }
+    if (draft.length > 20) { errBox.textContent = 'Maximum of 20 links.'; return; }
+    try {
+      const sb = await Cloud.waitForClient();
+      // Diff: delete removed, upsert remaining (with order)
+      const oldIds = new Set(HL_DATA.map(l => l.id));
+      const keepIds = new Set(draft.filter(r=>r.id).map(r=>r.id));
+      const toDelete = [...oldIds].filter(id => !keepIds.has(id));
+      if (toDelete.length) {
+        const { error: delErr } = await sb.from('helpful_links').delete().in('id', toDelete);
+        if (delErr) throw delErr;
+      }
+      // Upsert each with order
+      for (let i=0;i<draft.length;i++) {
+        const r = draft[i];
+        const row = { title: r.title.trim(), url: r.url.trim(), order: i };
+        if (r.id) {
+          const { error } = await sb.from('helpful_links').update(row).eq('id', r.id);
+          if (error) throw error;
+        } else {
+          const { error } = await sb.from('helpful_links').insert(row);
+          if (error) throw error;
+        }
+      }
+      back.remove();
+      await loadHelpfulLinks();
+      toast('Links saved', 'success');
+    } catch (e) {
+      console.error(e);
+      errBox.textContent = e.message || 'Save failed';
+      toast('Could not save links', 'error');
+    }
+  };
+}
+</script>
+<script>
+// Hook into role visibility refresh: ensure HL edit button reflects current role.
+(function(){
+  const orig = window.applyRoleVisibility;
+  if (typeof orig === 'function') {
+    window.applyRoleVisibility = function(){
+      orig.apply(this, arguments);
+      const btn = document.getElementById('hlEditBtn');
+      if (btn) btn.style.display = (window.currentUser?.role === 'admin') ? '' : 'none';
+    };
+  }
+})();
 </script>
 </body>
 </html>
