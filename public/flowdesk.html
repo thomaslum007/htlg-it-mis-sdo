@@ -989,7 +989,7 @@ const Cloud = {
     if (map.dashboard_segments)        DB.dashboardSegments = map.dashboard_segments;
   },
   mapProfileFromDB(r, role) {
-    return { id: r.id, name: r.name||'', username: r.username||'', email: r.email||'', role: role||'viewer', dept: r.dept||'', responsibilities: r.responsibilities||'', avatarColor: r.avatar_color, forcePasswordReset: !!r.force_password_reset };
+    return { id: r.id, name: r.name||'', username: r.username||'', email: r.email||'', role: role||'viewer', dept: r.dept||'', workstream: r.workstream||'', responsibilities: r.responsibilities||'', avatarColor: r.avatar_color, forcePasswordReset: !!r.force_password_reset };
   },
   mapWsFromDB(r) { return { id: r.id, name: r.name, dept: r.dept||'', desc: r.description||'', color: r.color||'#6c63ff' }; },
   mapIssueFromDB(r) {
