@@ -902,7 +902,7 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
     <div class="modal-header">
       <div class="modal-title">Reset Password Required</div>
     </div>
-    <div class="modal-body">
+    <div class="modal-body" id="forcePwStepEntry">
       <div class="settings-desc">Your admin requires a new password before you continue.</div>
       <div class="form-group">
         <label>New Password</label>
@@ -918,12 +918,29 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
           <button type="button" class="pw-toggle" aria-label="Show password" onclick="togglePw(this)" title="Show/hide password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
       </div>
-    </div>
       <div style="font-size:11px;color:var(--text3,#6c6c80);margin-top:4px;line-height:1.4;">Password must be at least 6 characters, include one uppercase letter, one lowercase letter, one number, and one special character.</div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-body hidden" id="forcePwStepConfirm">
+      <div style="text-align:center;padding:8px 0;">
+        <div style="font-size:42px;line-height:1;">🔐</div>
+        <div style="margin-top:12px;font-weight:600;">Are you sure you want to set this as your new password?</div>
+        <div class="settings-desc" style="margin-top:6px;">You'll use it the next time you sign in.</div>
+      </div>
+    </div>
+    <div class="modal-body hidden" id="forcePwStepSuccess">
+      <div style="text-align:center;padding:12px 0;">
+        <div style="font-size:48px;line-height:1;">✅</div>
+        <div style="margin-top:12px;font-weight:600;">Password updated successfully</div>
+        <div class="settings-desc" style="margin-top:6px;">Taking you to the app…</div>
+      </div>
+    </div>
+    <div class="modal-footer" id="forcePwFooterEntry">
       <button class="btn btn-ghost" onclick="doLogout()">Sign Out</button>
-      <button class="btn btn-primary" onclick="submitForcedPasswordReset()">Update Password</button>
+      <button class="btn btn-primary" onclick="reviewForcedPasswordReset()">Update Password</button>
+    </div>
+    <div class="modal-footer hidden" id="forcePwFooterConfirm">
+      <button class="btn btn-ghost" onclick="forcePwBackToEntry()">Back</button>
+      <button class="btn btn-primary" id="forcePwConfirmBtn" onclick="submitForcedPasswordReset()">Confirm &amp; Save</button>
     </div>
   </div>
 </div>
