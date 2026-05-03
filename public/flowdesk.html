@@ -2861,7 +2861,36 @@ function openForcedPasswordReset() {
   if (!modal) return;
   document.getElementById('forceNewPassword').value = '';
   document.getElementById('forceConfirmPassword').value = '';
+  forcePwShowStep('entry');
   modal.classList.remove('hidden');
+}
+
+function forcePwShowStep(step) {
+  const map = {
+    entry:   { body:'forcePwStepEntry',   footer:'forcePwFooterEntry' },
+    confirm: { body:'forcePwStepConfirm', footer:'forcePwFooterConfirm' },
+    success: { body:'forcePwStepSuccess', footer:null }
+  };
+  ['forcePwStepEntry','forcePwStepConfirm','forcePwStepSuccess'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.classList.add('hidden');
+  });
+  ['forcePwFooterEntry','forcePwFooterConfirm'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.classList.add('hidden');
+  });
+  const cfg = map[step] || map.entry;
+  const b = document.getElementById(cfg.body); if (b) b.classList.remove('hidden');
+  if (cfg.footer) { const f = document.getElementById(cfg.footer); if (f) f.classList.remove('hidden'); }
+}
+
+function forcePwBackToEntry() { forcePwShowStep('entry'); }
+
+function reviewForcedPasswordReset() {
+  const password = document.getElementById('forceNewPassword').value;
+  const confirmPassword = document.getElementById('forceConfirmPassword').value;
+  const pwErr = validatePassword(password);
+  if (pwErr) { toast(pwErr, 'error'); return; }
+  if (password !== confirmPassword) { toast('Passwords do not match.', 'error'); return; }
+  forcePwShowStep('confirm');
 }
 
 
@@ -2877,25 +2906,31 @@ async function submitForcedPasswordReset() {
   const password = document.getElementById('forceNewPassword').value;
   const confirmPassword = document.getElementById('forceConfirmPassword').value;
   const pwErr = validatePassword(password);
-  if (pwErr) { toast(pwErr, 'error'); return; }
-  if (password !== confirmPassword) { toast('Passwords do not match.', 'error'); return; }
-  if (!confirm('Are you sure you want to set this as your new password?')) return;
-  const sb = await Cloud.waitForClient();
-  const { error } = await sb.auth.updateUser({ password });
-  if (error) { toast('Password update failed: ' + error.message, 'error'); return; }
-  // Clear the force_password_reset flag
-  const { error: profileError } = await sb.from('profiles').update({ force_password_reset: false }).eq('id', currentUser.id);
-  if (profileError) { console.error('Could not clear force_password_reset flag', profileError); }
-  currentUser.forcePasswordReset = false;
-  const u = DB.users.find(x => x.id === currentUser.id);
-  if (u) u.forcePasswordReset = false;
-  // Refresh session to ensure updated profile is loaded
+  if (pwErr) { toast(pwErr, 'error'); forcePwShowStep('entry'); return; }
+  if (password !== confirmPassword) { toast('Passwords do not match.', 'error'); forcePwShowStep('entry'); return; }
+  const btn = document.getElementById('forcePwConfirmBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session) await sb.auth.refreshSession();
-  } catch(_) {}
-  closeModal('forcePasswordModal');
-  toast('Password updated successfully! Welcome to FlowDesk.', 'success');
+    const sb = await Cloud.waitForClient();
+    const { error } = await sb.auth.updateUser({ password });
+    if (error) { toast('Password update failed: ' + error.message, 'error'); forcePwShowStep('entry'); return; }
+    const { error: profileError } = await sb.from('profiles').update({ force_password_reset: false }).eq('id', currentUser.id);
+    if (profileError) console.error('Could not clear force_password_reset flag', profileError);
+    currentUser.forcePasswordReset = false;
+    const u = DB.users.find(x => x.id === currentUser.id);
+    if (u) u.forcePasswordReset = false;
+    try { await sb.auth.refreshSession(); } catch(_) {}
+    forcePwShowStep('success');
+    toast('Password updated successfully!', 'success');
+    setTimeout(() => {
+      const modal = document.getElementById('forcePasswordModal');
+      if (modal) modal.classList.add('hidden');
+      document.getElementById('forceNewPassword').value = '';
+      document.getElementById('forceConfirmPassword').value = '';
+    }, 1400);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirm & Save'; }
+  }
 }
 
 // ====== ROLES & PERMISSIONS ======
