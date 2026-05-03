@@ -2897,24 +2897,44 @@ async function submitForcedPasswordReset() {
   if (password !== confirmPassword) { toast('Passwords do not match.', 'error'); forcePwShowStep('entry'); return; }
   const btn = document.getElementById('forcePwConfirmBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  let completed = false;
   try {
     const sb = await Cloud.waitForClient();
+    const userId = currentUser?.id || (await sb.auth.getUser()).data?.user?.id;
+    if (!userId) throw new Error('Could not identify the signed-in user. Please sign in again.');
+
+    // Step A: update auth password first.
     const { error } = await sb.auth.updateUser({ password });
-    if (error) { toast('Password update failed: ' + error.message, 'error'); forcePwShowStep('entry'); return; }
-    const { error: profileError } = await sb.from('profiles').update({ force_password_reset: false }).eq('id', currentUser.id);
-    if (profileError) console.error('Could not clear force_password_reset flag', profileError);
+    if (error) throw new Error('Password update failed: ' + error.message);
+
+    // Step B: only after auth succeeds, clear the same profile flag used by Admin > Users.
+    const { error: profileError } = await sb
+      .from('profiles')
+      .update({ force_password_reset: false })
+      .eq('id', userId);
+    if (profileError) throw new Error('Password changed, but reset flag could not be cleared: ' + profileError.message);
+
     currentUser.forcePasswordReset = false;
-    const u = DB.users.find(x => x.id === currentUser.id);
+    const u = DB.users.find(x => x.id === userId);
     if (u) u.forcePasswordReset = false;
-    try { await sb.auth.refreshSession(); } catch(_) {}
+
+    // Step C: refresh session/local data before dismissing and landing on Dashboard.
+    await Promise.all([
+      sb.auth.refreshSession(),
+      cloudHandleChange('users').catch(() => null),
+    ]);
+    completed = true;
     forcePwShowStep('success');
     toast('Password updated successfully!', 'success');
-    setTimeout(() => {
-      const modal = document.getElementById('forcePasswordModal');
-      if (modal) modal.classList.add('hidden');
-      document.getElementById('forceNewPassword').value = '';
-      document.getElementById('forceConfirmPassword').value = '';
-    }, 1400);
+    const modal = document.getElementById('forcePasswordModal');
+    if (modal) modal.classList.add('hidden');
+    document.getElementById('forceNewPassword').value = '';
+    document.getElementById('forceConfirmPassword').value = '';
+    nav('dashboard', document.querySelector('.sidebar .nav-item'));
+  } catch (err) {
+    console.error('Forced password reset failed', err);
+    toast(err?.message || 'Password reset failed. Please try again.', 'error');
+    if (!completed) forcePwShowStep('confirm');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Confirm & Save'; }
   }
