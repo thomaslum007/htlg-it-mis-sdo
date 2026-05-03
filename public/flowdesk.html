@@ -1366,12 +1366,6 @@ async function doAuthSubmit() {
   let sb;
   try { sb = await Cloud.waitForClient(); }
   catch (e) { showMsg('Could not reach the server. Check your connection.'); if (btn){btn.disabled=false; btn.textContent=btn.dataset._label||'Sign In';} return; }
-  // Watchdog: never let the button stay disabled forever.
-  const watchdog = setTimeout(() => {
-    try { clearAuthStorage(); } catch(_){}
-    if (btn) { btn.disabled = false; btn.textContent = btn.dataset._label || 'Sign In'; }
-    showMsg('Sign-in is taking too long. Stale session was cleared — please try again.  [Refresh page manually or press CTRL+R] ');
-  }, 8000);
   try {
     // Always start sign-in from a clean slate so stale tokens cannot block us.
     if (authMode !== 'signup') {
@@ -1404,7 +1398,6 @@ async function doAuthSubmit() {
     else if (/failed to fetch|network/i.test(raw)) friendly = 'Network error reaching the server. Try again.';
     showMsg(friendly);
   } finally {
-    clearTimeout(watchdog);
     if (btn) { btn.disabled = false; btn.textContent = btn.dataset._label || (authMode === 'signup' ? 'Create Account' : 'Sign In'); }
   }
 }
@@ -1417,26 +1410,25 @@ function doLogin() { return doAuthSubmit(); }
 // clears any sb-* cookies. Safe to call multiple times.
 function clearAuthStorage() {
   try {
-    const wipe = (store) => {
-      if (!store) return;
-      const keys = [];
-      for (let i = 0; i < store.length; i++) {
-        const k = store.key(i);
-        if (k && (k.startsWith('sb-') || k.includes('supabase.auth') || k.includes('-auth-token'))) {
-          keys.push(k);
-        }
-      }
-      keys.forEach(k => { try { store.removeItem(k); } catch(_){} });
+    // Wipe ALL local + session storage (full reset, no stale state)
+    try { window.localStorage.clear(); } catch(_){}
+    try { window.sessionStorage.clear(); } catch(_){}
+    // Explicitly kill sb-access-token / sb-refresh-token cookies + any sb-*/supabase cookies
+    const killCookie = (name) => {
+      const variants = [
+        `${name}=; Max-Age=0; path=/`,
+        `${name}=; Max-Age=0; path=/; domain=${location.hostname}`,
+        `${name}=; Max-Age=0; path=/; domain=.${location.hostname}`,
+        `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`,
+      ];
+      variants.forEach(v => { try { document.cookie = v; } catch(_){} });
     };
-    wipe(window.localStorage);
-    wipe(window.sessionStorage);
-    // Clear any sb-* cookies on this host
+    killCookie('sb-access-token');
+    killCookie('sb-refresh-token');
     document.cookie.split(';').forEach(c => {
       const name = c.split('=')[0].trim();
-      if (name.startsWith('sb-') || name.includes('supabase')) {
-        document.cookie = name + '=; Max-Age=0; path=/';
-        document.cookie = name + '=; Max-Age=0; path=/; domain=' + location.hostname;
-      }
+      if (!name) return;
+      if (name.startsWith('sb-') || name.includes('supabase')) killCookie(name);
     });
   } catch (e) { console.warn('clearAuthStorage failed', e); }
 }
@@ -1464,9 +1456,10 @@ async function doLogout() {
   } catch(_){}
   // Always wipe local artefacts even if the network call failed
   clearAuthStorage();
-  Cloud.unsubscribe();
+  try { Cloud.unsubscribe(); } catch(_){}
   currentUser = null;
-  showLoginUI();
+  // Force a full browser reset so no in-memory state survives
+  window.location.href = window.location.pathname;
 }
 
 // Hydrate currentUser from a Supabase session.
@@ -1511,30 +1504,24 @@ async function enterAppForCurrentUser() {
 (async function bootstrapAuth() {
   const sb = await Cloud.waitForClient();
 
-  // ----- Login page mount check -----
-  // If we land on the login page with a stored session that the server
-  // no longer accepts (a "ghost" session), wipe it before the user tries
-  // to sign in. We do this fire-and-forget so it never blocks UI.
-  (async () => {
-    try {
-      const { data, error } = await sb.auth.getSession();
-      if (error) {
-        clearAuthStorage();
-        showLoginUI();
-        return;
-      }
-      const sess = data?.session;
-      if (sess?.expires_at && sess.expires_at * 1000 < Date.now()) {
-        // Stored session is already expired — clear it.
-        try { await sb.auth.signOut({ scope: 'local' }); } catch(_){}
-        clearAuthStorage();
-        showLoginUI();
-      }
-    } catch (e) {
+  // ----- Refresh guard -----
+  // On every page load, immediately validate the stored session.
+  // If getSession errors OR returns no session OR returns an expired session,
+  // wipe ALL local auth storage instantly (no timeouts, no retries).
+  try {
+    const { data, error } = await sb.auth.getSession();
+    const sess = data?.session;
+    const expired = sess?.expires_at ? (sess.expires_at * 1000 < Date.now()) : false;
+    if (error || !sess || expired) {
       clearAuthStorage();
+      currentUser = null;
       showLoginUI();
     }
-  })();
+  } catch (e) {
+    clearAuthStorage();
+    currentUser = null;
+    showLoginUI();
+  }
 
   // Listener FIRST (per Supabase guidance), then read current session.
   sb.auth.onAuthStateChange(async (event, session) => {
@@ -1556,7 +1543,7 @@ async function enterAppForCurrentUser() {
       if (ok) await enterAppForCurrentUser();
     } else {
       // Signed out, expired, or invalid session — drop UI state and clean storage.
-      if (expired) clearAuthStorage();
+      clearAuthStorage();
       currentUser = null;
       Cloud.unsubscribe();
       showLoginUI();
