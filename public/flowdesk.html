@@ -103,6 +103,8 @@ body.login-mode { display: block; }
 .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; font-family: var(--font); }
 .btn-primary { background: var(--accent); color: white; }
 .btn-primary:hover { background: var(--accent2); }
+.btn[disabled] { opacity: 0.65; cursor: not-allowed; }
+.btn-spinner { width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; display: inline-block; animation: spin 0.7s linear infinite; }
 .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border2); }
 .btn-ghost:hover { background: var(--surface2); color: var(--text); }
 .btn-danger { background: transparent; color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
@@ -349,6 +351,7 @@ textarea { resize: vertical; min-height: 80px; }
 .toast.error { border-left: 3px solid var(--red); }
 .toast.info { border-left: 3px solid var(--accent); }
 @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* Divider */
 .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
@@ -2896,48 +2899,39 @@ async function submitForcedPasswordReset() {
   if (pwErr) { toast(pwErr, 'error'); forcePwShowStep('entry'); return; }
   if (password !== confirmPassword) { toast('Passwords do not match.', 'error'); forcePwShowStep('entry'); return; }
   const btn = document.getElementById('forcePwConfirmBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-  let completed = false;
+  const setSaving = (isSaving) => {
+    if (!btn) return;
+    btn.disabled = isSaving;
+    btn.innerHTML = isSaving ? '<span class="btn-spinner" aria-hidden="true"></span><span>Saving…</span>' : 'Confirm &amp; Save';
+  };
+  setSaving(true);
   try {
     const sb = await Cloud.waitForClient();
-    const userId = currentUser?.id || (await sb.auth.getUser()).data?.user?.id;
+    const userResult = await sb.auth.getUser();
+    if (userResult.error) throw new Error('Could not verify the signed-in user: ' + userResult.error.message);
+    const userId = userResult.data?.user?.id || currentUser?.id;
     if (!userId) throw new Error('Could not identify the signed-in user. Please sign in again.');
 
-    // Step A: update auth password first.
-    const { error } = await sb.auth.updateUser({ password });
-    if (error) throw new Error('Password update failed: ' + error.message);
+    const { error: authError } = await sb.auth.updateUser({ password });
+    if (authError) throw new Error('Password update failed: ' + authError.message);
 
-    // Step B: only after auth succeeds, clear the same profile flag used by Admin > Users.
     const { error: profileError } = await sb
       .from('profiles')
       .update({ force_password_reset: false })
       .eq('id', userId);
     if (profileError) throw new Error('Password changed, but reset flag could not be cleared: ' + profileError.message);
 
-    if (currentUser) currentUser.forcePasswordReset = false;
-    const u = DB.users.find(x => x.id === userId);
-    if (u) u.forcePasswordReset = false;
+    const { error: refreshError } = await sb.auth.refreshSession();
+    if (refreshError) throw new Error('Password changed, but session refresh failed: ' + refreshError.message);
 
-    // Step C: refresh session/local data before dismissing and landing on Dashboard.
-    const [refreshResult] = await Promise.all([
-      sb.auth.refreshSession(),
-      cloudHandleChange('users').catch(() => null),
-    ]);
-    if (refreshResult?.error) throw new Error('Password changed, but session refresh failed: ' + refreshResult.error.message);
-    completed = true;
     forcePwShowStep('success');
     toast('Password updated successfully!', 'success');
-    const modal = document.getElementById('forcePasswordModal');
-    if (modal) modal.classList.add('hidden');
-    document.getElementById('forceNewPassword').value = '';
-    document.getElementById('forceConfirmPassword').value = '';
-    nav('dashboard', document.querySelector('.sidebar .nav-item'));
+    window.location.replace('/dashboard');
   } catch (err) {
     console.error('Forced password reset failed', err);
     toast(err?.message || 'Password reset failed. Please try again.', 'error');
-    if (!completed) forcePwShowStep('confirm');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Confirm & Save'; }
+    setSaving(false);
   }
 }
 
