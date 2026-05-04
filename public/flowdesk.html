@@ -2918,6 +2918,7 @@ async function submitForcedPasswordReset() {
     new Promise((_, reject) => setTimeout(() => reject(new Error(label + ' timed out after ' + ms + 'ms')), ms))
   ]);
   setSaving(true);
+  forcePasswordResetInProgress = true;
   try {
     const sb = await Cloud.waitForClient();
     // Prefer cached session (instant) over getUser() which hits the network and can hang.
@@ -2930,7 +2931,7 @@ async function submitForcedPasswordReset() {
     }
     if (!userId) throw new Error('Could not identify the signed-in user. Please sign in again.');
 
-    const { error: authError } = await withTimeout(sb.auth.updateUser({ password }), 15000, 'Password update');
+    const { error: authError } = await withTimeout(sb.auth.updateUser({ password }), 30000, 'Password update');
     if (authError) throw new Error('Password update failed: ' + authError.message);
 
     // Use .select() so a zero-row result (e.g. RLS rejection) surfaces as an explicit error
@@ -2956,6 +2957,7 @@ async function submitForcedPasswordReset() {
     toast('Password updated successfully!', 'success');
     window.location.replace('/dashboard');
   } catch (err) {
+    forcePasswordResetInProgress = false;
     console.error('Forced password reset failed', err);
     toast(err?.message || 'Password reset failed. Please try again.', 'error');
   } finally {
