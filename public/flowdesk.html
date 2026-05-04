@@ -103,6 +103,8 @@ body.login-mode { display: block; }
 .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; font-family: var(--font); }
 .btn-primary { background: var(--accent); color: white; }
 .btn-primary:hover { background: var(--accent2); }
+.btn[disabled] { opacity: 0.65; cursor: not-allowed; }
+.btn-spinner { width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; display: inline-block; animation: spin 0.7s linear infinite; }
 .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border2); }
 .btn-ghost:hover { background: var(--surface2); color: var(--text); }
 .btn-danger { background: transparent; color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
@@ -349,6 +351,7 @@ textarea { resize: vertical; min-height: 80px; }
 .toast.error { border-left: 3px solid var(--red); }
 .toast.info { border-left: 3px solid var(--accent); }
 @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* Divider */
 .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
