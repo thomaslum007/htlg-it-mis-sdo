@@ -1503,6 +1503,10 @@ async function enterAppForCurrentUser() {
   if (currentUser.forcePasswordReset) openForcedPasswordReset();
 }
 
+// Prevent USER_UPDATED from re-entering app hydration while the forced reset
+// sequence is still clearing the profile flag.
+let forcePasswordResetInProgress = false;
+
 // Session bootstrap: handle sign-in / sign-out events from Supabase.
 (async function bootstrapAuth() {
   const sb = await Cloud.waitForClient();
@@ -1527,30 +1531,35 @@ async function enterAppForCurrentUser() {
   }
 
   // Listener FIRST (per Supabase guidance), then read current session.
-  sb.auth.onAuthStateChange(async (event, session) => {
-    // Validity guard: treat token refresh failures / expired sessions as signed out.
-    const expired = session?.expires_at ? (session.expires_at * 1000 < Date.now()) : false;
-    if (event === 'TOKEN_REFRESHED' && !session) {
-      // Refresh failed — ghost session. Clean up and show login.
-      clearAuthStorage();
-      currentUser = null;
-      Cloud.unsubscribe();
-      showLoginUI();
-      return;
-    }
-    if (session?.user && !expired) {
-      // Profile may take a moment for the on-signup trigger to run; retry briefly.
-      let ok = await hydrateSessionUser(session);
-      let tries = 0;
-      while (!ok && tries < 5) { await new Promise(r=>setTimeout(r, 250)); ok = await hydrateSessionUser(session); tries++; }
-      if (ok) await enterAppForCurrentUser();
-    } else {
-      // Signed out, expired, or invalid session — drop UI state and clean storage.
-      clearAuthStorage();
-      currentUser = null;
-      Cloud.unsubscribe();
-      showLoginUI();
-    }
+  sb.auth.onAuthStateChange((event, session) => {
+    // Supabase auth callbacks must not await Supabase calls directly; doing so
+    // can deadlock auth methods like updateUser() after the backend succeeds.
+    setTimeout(async () => {
+      if (forcePasswordResetInProgress && event === 'USER_UPDATED') return;
+      // Validity guard: treat token refresh failures / expired sessions as signed out.
+      const expired = session?.expires_at ? (session.expires_at * 1000 < Date.now()) : false;
+      if (event === 'TOKEN_REFRESHED' && !session) {
+        // Refresh failed — ghost session. Clean up and show login.
+        clearAuthStorage();
+        currentUser = null;
+        Cloud.unsubscribe();
+        showLoginUI();
+        return;
+      }
+      if (session?.user && !expired) {
+        // Profile may take a moment for the on-signup trigger to run; retry briefly.
+        let ok = await hydrateSessionUser(session);
+        let tries = 0;
+        while (!ok && tries < 5) { await new Promise(r=>setTimeout(r, 250)); ok = await hydrateSessionUser(session); tries++; }
+        if (ok) await enterAppForCurrentUser();
+      } else {
+        // Signed out, expired, or invalid session — drop UI state and clean storage.
+        clearAuthStorage();
+        currentUser = null;
+        Cloud.unsubscribe();
+        showLoginUI();
+      }
+    }, 0);
   });
   const { data } = await sb.auth.getSession();
   const boot = data?.session;
@@ -2909,6 +2918,7 @@ async function submitForcedPasswordReset() {
     new Promise((_, reject) => setTimeout(() => reject(new Error(label + ' timed out after ' + ms + 'ms')), ms))
   ]);
   setSaving(true);
+  forcePasswordResetInProgress = true;
   try {
     const sb = await Cloud.waitForClient();
     // Prefer cached session (instant) over getUser() which hits the network and can hang.
@@ -2921,7 +2931,7 @@ async function submitForcedPasswordReset() {
     }
     if (!userId) throw new Error('Could not identify the signed-in user. Please sign in again.');
 
-    const { error: authError } = await withTimeout(sb.auth.updateUser({ password }), 15000, 'Password update');
+    const { error: authError } = await withTimeout(sb.auth.updateUser({ password }), 30000, 'Password update');
     if (authError) throw new Error('Password update failed: ' + authError.message);
 
     // Use .select() so a zero-row result (e.g. RLS rejection) surfaces as an explicit error
@@ -2947,6 +2957,7 @@ async function submitForcedPasswordReset() {
     toast('Password updated successfully!', 'success');
     window.location.replace('/dashboard');
   } catch (err) {
+    forcePasswordResetInProgress = false;
     console.error('Forced password reset failed', err);
     toast(err?.message || 'Password reset failed. Please try again.', 'error');
   } finally {
