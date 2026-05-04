@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script src="https://unpkg.com/lucide@latest"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FlowDesk — Project Management Suite</title>
 
@@ -491,7 +492,7 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
   <div class="nav">
     <div class="nav-section">
       <div class="nav-label">Overview</div>
-      <button class="nav-item active" onclick="nav('dashboard',this)"><span class="icon">📊</span><span>Dashboard</span></button>
+      <button class="nav-item active" onclick="nav('dashboard',this)"><i data-lucide="layout-dashboard"></i><span>Dashboard</span></button>
       <button class="nav-item" onclick="nav('issues',this)"><span class="icon">🗂</span><span>Issues</span> <span class="nav-badge" id="openCount">0</span></button>
       <button class="nav-item" onclick="nav('kanban',this)"><span class="icon">📋</span><span>Kanban</span></button>
       <button class="nav-item" onclick="nav('gantt',this)"><span class="icon">📅</span><span>Gantt Chart</span></button>
