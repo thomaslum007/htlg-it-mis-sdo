@@ -2955,7 +2955,7 @@ async function submitForcedPasswordReset() {
 
     forcePwShowStep('success');
     toast('Password updated successfully!', 'success');
-    window.location.replace('/dashboard');
+    window.location.replace('/');
   } catch (err) {
     forcePasswordResetInProgress = false;
     console.error('Forced password reset failed', err);
