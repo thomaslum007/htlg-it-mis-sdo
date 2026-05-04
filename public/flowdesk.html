@@ -2904,25 +2904,39 @@ async function submitForcedPasswordReset() {
     btn.disabled = isSaving;
     btn.innerHTML = isSaving ? '<span class="btn-spinner" aria-hidden="true"></span><span>Saving…</span>' : 'Confirm &amp; Save';
   };
+  const withTimeout = (promise, ms, label) => Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(label + ' timed out after ' + ms + 'ms')), ms))
+  ]);
   setSaving(true);
   try {
     const sb = await Cloud.waitForClient();
-    const userResult = await sb.auth.getUser();
+    const userResult = await withTimeout(sb.auth.getUser(), 10000, 'getUser');
     if (userResult.error) throw new Error('Could not verify the signed-in user: ' + userResult.error.message);
     const userId = userResult.data?.user?.id || currentUser?.id;
     if (!userId) throw new Error('Could not identify the signed-in user. Please sign in again.');
 
-    const { error: authError } = await sb.auth.updateUser({ password });
+    const { error: authError } = await withTimeout(sb.auth.updateUser({ password }), 15000, 'Password update');
     if (authError) throw new Error('Password update failed: ' + authError.message);
 
-    const { error: profileError } = await sb
-      .from('profiles')
-      .update({ force_password_reset: false })
-      .eq('id', userId);
+    // Use .select() so a zero-row result (e.g. RLS rejection) surfaces as an explicit error
+    // instead of silently returning success.
+    const { data: updatedRows, error: profileError } = await withTimeout(
+      sb.from('profiles').update({ force_password_reset: false }).eq('id', userId).select('id, force_password_reset'),
+      10000,
+      'Profile flag update'
+    );
     if (profileError) throw new Error('Password changed, but reset flag could not be cleared: ' + profileError.message);
+    if (!updatedRows || updatedRows.length === 0) {
+      throw new Error('Password changed, but reset flag was not cleared (no profile row updated — check RLS).');
+    }
 
-    const { error: refreshError } = await sb.auth.refreshSession();
-    if (refreshError) throw new Error('Password changed, but session refresh failed: ' + refreshError.message);
+    try {
+      const { error: refreshError } = await withTimeout(sb.auth.refreshSession(), 8000, 'Session refresh');
+      if (refreshError) console.warn('Session refresh returned error:', refreshError.message);
+    } catch (refreshErr) {
+      console.warn('Session refresh failed/timed out — continuing:', refreshErr?.message);
+    }
 
     forcePwShowStep('success');
     toast('Password updated successfully!', 'success');
