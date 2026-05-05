@@ -131,7 +131,19 @@ body.login-mode { display: block; }
 /* ----- Editable dashboard ----- */
 .dash-toolbar { display:flex; gap:8px; align-items:center; flex-wrap:nowrap; overflow-x:auto; margin-bottom:12px; }
 .dash-toolbar .spacer { flex:1; }
-.dash-toolbar select { background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:5px 8px; font-family:var(--mono,monospace); font-size:12px; min-width:110px; flex-shrink:0; }
+.dash-toolbar select { 
+  background: var(--surface2); 
+  color: var(--text); 
+  border: 1px solid var(--border); 
+  border-radius: 6px; 
+  padding: 5px 24px 5px 8px; /* Added right padding for the arrow icon */
+  font-family: var(--mono, monospace); 
+  font-size: 12px; 
+  min-width: 80px; /* Reduced from 110px */
+  max-width: 140px; /* Optional: prevents them from growing too large */
+  flex: 0 1 auto; /* Allows them to shrink if the screen is small */
+  cursor: pointer;
+}
 .gridstack-host { background: transparent; }
 .gridstack-host .grid-stack-item-content { background: var(--surface); border:1px solid var(--border); border-radius: var(--radius,8px); padding:14px; overflow:auto; display:flex; flex-direction:column; }
 .gridstack-host.editing .grid-stack-item-content { border-style: dashed; }
