@@ -559,14 +559,17 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
     </div>
   </div>
 
-  <!-- DASHBOARD -->
-  <div class="content page active" id="page-dashboard">
-    <div class="filter-bar">
-      <div class="filter-title">Filters</div>
-      <div class="filter-row" id="dash_filterRow"></div>
-    </div>
-    <div class="dash-toolbar">
-      <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;flex-shrink:0;">Period</label>
+ <!-- DASHBOARD -->
+<div class="content page active" id="page-dashboard">
+
+  <!-- Single unified filter bar -->
+  <div class="filter-bar">
+    <div class="filter-title">Filters</div>
+    <div class="filter-row" id="dash_filterRow"></div>
+
+    <!-- Period row merged in -->
+    <div class="filter-row" style="margin-top:6px;">
+      <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;flex-shrink:0;align-self:center;">Period</label>
       <select id="dashYear"></select>
       <select id="dashQuarter">
         <option value="">All Quarters</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
@@ -578,13 +581,17 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
         <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
         <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
       </select>
-      <div class="spacer"></div>
-      <button id="dashEditBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="toggleDashEdit()">✏️ Edit Dashboard</button>
-      <button id="dashSaveBtn" class="btn btn-sm" style="display:none;background:var(--blue,#3b82f6);color:#fff;" onclick="saveDashLayout()">💾 Save</button>
-      <button id="dashResetBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="resetDashLayout()">↺ Reset</button>
-      <button id="dashCancelBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="cancelDashEdit()">Cancel</button>
     </div>
+  </div>
 
+  <!-- Separate toolbar row for Edit Dashboard only -->
+  <div class="dash-toolbar">
+    <div class="spacer"></div>
+    <button id="dashEditBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="toggleDashEdit()">✏️ Edit Dashboard</button>
+    <button id="dashSaveBtn" class="btn btn-sm" style="display:none;background:var(--blue,#3b82f6);color:#fff;" onclick="saveDashLayout()">💾 Save</button>
+    <button id="dashResetBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="resetDashLayout()">↺ Reset</button>
+    <button id="dashCancelBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="cancelDashEdit()">Cancel</button>
+  </div>
     <!-- Default (read-only) dashboard — shown when no custom layout -->
     <div id="dashDefault">
       <div class="grid-4 mb-4" id="statCards"></div>
