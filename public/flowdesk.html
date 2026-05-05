@@ -3370,7 +3370,6 @@ function toggleHelpfulLinks() {
 function openHelpfulLinksEditor() {
   if (currentUser?.role !== 'admin') { toast('Only admins can edit links.', 'error'); return; }
   const back = document.createElement('div'); back.className = 'modal-backdrop';
-  // Working copy
   const draft = HL_DATA.map(l => ({ id: l.id, title: l.title || '', url: l.url || '' }));
   back.innerHTML = `
     <div class="modal-card" style="width:min(560px,94vw);">
@@ -3387,40 +3386,96 @@ function openHelpfulLinksEditor() {
 
   const rowsWrap = back.querySelector('#hlEditRows');
   const errBox = back.querySelector('#hlEditError');
+
+  // ── Drag-and-drop state ──
+  let dragIdx = null;
+
   const renderRows = () => {
-    rowsWrap.innerHTML = draft.map((r,idx)=>`
-      <div class="hl-row" data-idx="${idx}">
-        <input data-k="title" placeholder="Title" value="${escapeAttr(r.title)}">
-        <input data-k="url" placeholder="https://example.com" value="${escapeAttr(r.url)}">
+    rowsWrap.innerHTML = draft.map((r, idx) => `
+      <div class="hl-row" data-idx="${idx}" draggable="true"
+           style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <span class="hl-drag-handle" data-idx="${idx}"
+              title="Drag to reorder"
+              style="cursor:grab;font-size:16px;color:var(--text3);padding:0 2px;user-select:none;">⠿</span>
+        <div style="display:flex;flex-direction:column;gap:2px;">
+          <button type="button" class="btn btn-ghost btn-sm" data-action="up" data-idx="${idx}"
+                  style="padding:0 4px;line-height:1;" ${idx === 0 ? 'disabled' : ''}>▲</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-action="down" data-idx="${idx}"
+                  style="padding:0 4px;line-height:1;" ${idx === draft.length - 1 ? 'disabled' : ''}>▼</button>
+        </div>
+        <input data-k="title" placeholder="Title" value="${escapeAttr(r.title)}" style="flex:1;">
+        <input data-k="url" placeholder="https://example.com" value="${escapeAttr(r.url)}" style="flex:2;">
         <button type="button" class="btn btn-ghost btn-sm" data-action="del">✕</button>
       </div>
     `).join('') || '<div style="color:var(--text3);font-size:12px;">No links yet. Click "+ Add Link".</div>';
-    rowsWrap.querySelectorAll('input').forEach(inp=>{
+
+    // Input binding
+    rowsWrap.querySelectorAll('input').forEach(inp => {
       inp.oninput = () => {
         const idx = +inp.closest('.hl-row').dataset.idx;
         draft[idx][inp.dataset.k] = inp.value;
       };
     });
-    rowsWrap.querySelectorAll('[data-action="del"]').forEach(btn=>{
+
+    // Up / Down / Delete buttons
+    rowsWrap.querySelectorAll('[data-action]').forEach(btn => {
       btn.onclick = () => {
-        const idx = +btn.closest('.hl-row').dataset.idx;
-        if (!confirm('Remove this link?')) return;
-        draft.splice(idx,1); renderRows();
+        const idx = +btn.dataset.idx;
+        const action = btn.dataset.action;
+        if (action === 'del') {
+          if (!confirm('Remove this link?')) return;
+          draft.splice(idx, 1);
+        } else if (action === 'up' && idx > 0) {
+          [draft[idx - 1], draft[idx]] = [draft[idx], draft[idx - 1]];
+        } else if (action === 'down' && idx < draft.length - 1) {
+          [draft[idx], draft[idx + 1]] = [draft[idx + 1], draft[idx]];
+        }
+        renderRows();
       };
     });
+
+    // Drag-and-drop
+    rowsWrap.querySelectorAll('.hl-row[draggable]').forEach(row => {
+      row.addEventListener('dragstart', e => {
+        dragIdx = +row.dataset.idx;
+        e.dataTransfer.effectAllowed = 'move';
+        row.style.opacity = '0.5';
+      });
+      row.addEventListener('dragend', () => {
+        dragIdx = null;
+        row.style.opacity = '';
+        rowsWrap.querySelectorAll('.hl-row').forEach(r => r.style.background = '');
+      });
+      row.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        row.style.background = 'var(--hover, rgba(59,130,246,0.08))';
+      });
+      row.addEventListener('dragleave', () => {
+        row.style.background = '';
+      });
+      row.addEventListener('drop', e => {
+        e.preventDefault();
+        const targetIdx = +row.dataset.idx;
+        if (dragIdx === null || dragIdx === targetIdx) return;
+        const [moved] = draft.splice(dragIdx, 1);
+        draft.splice(targetIdx, 0, moved);
+        renderRows();
+      });
+    });
   };
+
   renderRows();
 
   back.querySelector('#hlAddRowBtn').onclick = () => {
     if (draft.length >= 20) { errBox.textContent = 'Maximum of 20 links allowed.'; return; }
-    draft.push({ id:null, title:'', url:'' });
+    draft.push({ id: null, title: '', url: '' });
     renderRows();
   };
 
   back.querySelector('#hlSaveBtn').onclick = async () => {
     errBox.textContent = '';
-    // Validate
-    for (let i=0;i<draft.length;i++) {
+    for (let i = 0; i < draft.length; i++) {
       const r = draft[i];
       if (!r.title.trim() || !r.url.trim()) { errBox.textContent = `Row ${i+1}: title and URL are required.`; return; }
       let parsedUrl;
@@ -3432,16 +3487,14 @@ function openHelpfulLinksEditor() {
     if (draft.length > 20) { errBox.textContent = 'Maximum of 20 links.'; return; }
     try {
       const sb = await Cloud.waitForClient();
-      // Diff: delete removed, upsert remaining (with order)
       const oldIds = new Set(HL_DATA.map(l => l.id));
-      const keepIds = new Set(draft.filter(r=>r.id).map(r=>r.id));
+      const keepIds = new Set(draft.filter(r => r.id).map(r => r.id));
       const toDelete = [...oldIds].filter(id => !keepIds.has(id));
       if (toDelete.length) {
         const { error: delErr } = await sb.from('helpful_links').delete().in('id', toDelete);
         if (delErr) throw delErr;
       }
-      // Upsert each with order
-      for (let i=0;i<draft.length;i++) {
+      for (let i = 0; i < draft.length; i++) {
         const r = draft[i];
         const row = { title: r.title.trim(), url: r.url.trim(), order: i };
         if (r.id) {
