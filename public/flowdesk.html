@@ -614,9 +614,9 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
     <div class="filter-bar">
       <div class="filter-title">Filters</div>
       <div class="filter-row" id="iss_filterRow"></div>
-      <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
-        <button class="btn btn-ghost btn-sm" onclick="exportExcel()" title="Export Excel">📤 Export</button>
-        <button class="btn btn-ghost btn-sm" id="importBtn" onclick="triggerImport()" title="Import Excel (admin only)">📥 Import</button>
+      <div class="filter-actions">
+        <button class="btn btn-ghost btn-sm" onclick="exportExcel()" title="Export all issues to Excel (backup)">📤 Export</button>
+        <button class="btn btn-ghost btn-sm" id="importBtn" onclick="triggerImport()" title="Import Excel — restores/updates by ID (admin only)">📥 Import</button>
         <input type="file" id="importFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importExcel(this)">
       </div>
     </div>
