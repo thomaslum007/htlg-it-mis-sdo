@@ -1897,12 +1897,13 @@ function renderWidget(w, issues) {
   body.innerHTML = '<canvas></canvas>';
   const cv = body.querySelector('canvas');
   let type = w.type === 'pie' ? 'pie' : (w.type === 'line' ? 'line' : 'bar');
+  const th = chartTheme();
   dashState.charts[w.i] = new Chart(cv, {
     type,
     data: { labels, datasets: [{ data: values, backgroundColor: type==='line' ? colors[0]+'33' : colors.map(c=>c+'aa'), borderColor: type==='line' ? colors[0] : colors, borderWidth: 2, fill: type==='line' }] },
     options: { responsive:true, maintainAspectRatio:false,
-      plugins: { legend:{ display: type!=='bar', labels:{ color:'#9090a8', font:{ size:11 } } } },
-      scales: type==='pie' ? {} : { x:{ ticks:{ color:'#9090a8' }, grid:{ color:'transparent' } }, y:{ ticks:{ color:'#9090a8' }, grid:{ color:'rgba(255,255,255,0.05)' } } }
+      plugins: { legend:{ display: type!=='bar', labels:{ color:th.legend, font:{ size:11 } } } },
+      scales: type==='pie' ? {} : { x:{ ticks:{ color:th.tick }, grid:{ color:'transparent' } }, y:{ ticks:{ color:th.tick }, grid:{ color:th.grid } } }
     }
   });
 }
