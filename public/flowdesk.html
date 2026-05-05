@@ -1900,7 +1900,7 @@ function renderWidget(w, issues) {
     } else { // count
       val = pool.length;
     }
-    body.innerHTML = `<div class="widget-kpi"><div class="num">${val}</div><div class="lbl">${escapeHtml(cfg.label||'KPI')}</div></div>`;
+    body.innerHTML = `<div class="widget-kpi"><div class="num">${val}</div>${cfg.label ? `<div class="lbl">${escapeHtml(cfg.label)}</div>` : ''}</div>`;
     return;
   }
   if (w.type === 'table') {
