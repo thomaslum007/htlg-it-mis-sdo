@@ -3248,9 +3248,11 @@ function toggleTheme() {
   try { localStorage.setItem('flowdesk_theme', isLight ? 'light' : 'dark'); } catch(_) {}
   const btn = document.getElementById('themeToggleBtn');
   if (btn) btn.textContent = isLight ? '☀️' : '🌙';
-  // Re-render charts so legend colors update
-  if (typeof renderDashboard === 'function' && document.getElementById('page-dashboard')?.classList.contains('active')) {
-    renderDashboard();
+  // Re-render charts so legend/tick colors pick up the new theme
+  if (document.getElementById('page-dashboard')?.classList.contains('active')) {
+    if (typeof renderDashboard === 'function') renderDashboard();
+    if (typeof renderStatusChart === 'function') renderStatusChart();
+    if (typeof renderPriorityChart === 'function') renderPriorityChart();
   }
 }
 (function initTheme() {
