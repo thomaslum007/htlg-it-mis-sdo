@@ -549,20 +549,19 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
 
 <!-- DASHBOARD -->
 <div class="content page active" id="page-dashboard">
-
-  <!-- Single unified filter bar -->
   <div class="filter-bar">
     <div class="filter-title">Filters</div>
     <div class="filter-row" id="dash_filterRow"></div>
 
-    <!-- Period row merged in -->
-    <label style=";text-transform:uppercase;letter-spacing:.04em;flex-shrink:0;align-self:center;">Period</label>
-    <div class="filter-row" style="margin-top:6px;">
-      <select id="dashYear"></select>
-      <select id="dashQuarter">
-        <option value="">All Quarters</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+    <!-- Period row: same style as filter-title, with top spacing -->
+    <div class="filter-title" style="margin-top:10px;">Period</div>
+    <div class="filter-row" style="margin-top:4px;">
+      <select id="dashYear" style="width:auto;min-width:90px;flex:0 0 auto;"></select>
+      <select id="dashQuarter" style="width:auto;min-width:100px;flex:0 0 auto;">
+        <option value="">All Quarters</option>
+        <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
       </select>
-      <select id="dashMonth">
+      <select id="dashMonth" style="width:auto;min-width:90px;flex:0 0 auto;">
         <option value="">All Months</option>
         <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
         <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
