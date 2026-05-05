@@ -404,6 +404,7 @@ textarea { resize: vertical; min-height: 80px; }
 .filter-title { font-size: 11px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; font-weight: 600; }
 .filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .filter-row select { min-width: 140px; }
+.filter-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
 /* Multi-select filter */
 .filter-multi { position: relative; min-width: 160px; }
 .filter-multi-btn { background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text); font-family: var(--font); font-size: 13px; padding: 8px 12px; cursor: pointer; width: 100%; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -613,9 +614,9 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
     <div class="filter-bar">
       <div class="filter-title">Filters</div>
       <div class="filter-row" id="iss_filterRow"></div>
-      <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
-        <button class="btn btn-ghost btn-sm" onclick="exportExcel()" title="Export Excel">📤 Export</button>
-        <button class="btn btn-ghost btn-sm" id="importBtn" onclick="triggerImport()" title="Import Excel (admin only)">📥 Import</button>
+      <div class="filter-actions">
+        <button class="btn btn-ghost btn-sm" onclick="exportExcel()" title="Export all issues to Excel (backup)">📤 Export</button>
+        <button class="btn btn-ghost btn-sm" id="importBtn" onclick="triggerImport()" title="Import Excel — restores/updates by ID (admin only)">📥 Import</button>
         <input type="file" id="importFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importExcel(this)">
       </div>
     </div>
@@ -1100,11 +1101,28 @@ const Cloud = {
       description: issue.desc||'', created_by: issue.createdBy||null,
       created_by_name: issue.createdByName||null,
     };
-    // Only send `key` on update (when row exists). Let DB trigger assign on new inserts.
-    if (issue.key) row.key = issue.key;
+    // Send `key` only when we already have an id (existing row) so the trigger can
+    // assign keys for fresh inserts. For imports, use upsertIssueByKey instead.
+    if (issue.key && issue.id) row.key = issue.key;
+    if (!row.id) delete row.id;
     const { data, error } = await sb.from('issues').upsert(row).select().single();
     if (error) { console.error('upsertIssue', error); toast('Save failed: ' + error.message,'error'); return null; }
     return Cloud.mapIssueFromDB(data);
+  },
+  // Upsert by `key` — used by Excel import so the same backup file does not create duplicates.
+  async upsertIssueByKey(issue) {
+    const sb = await this.waitForClient();
+    const row = {
+      key: issue.key, title: issue.title, type: issue.type, status: issue.status,
+      priority: issue.priority, assignee: issue.assignee||null, workstream: issue.workstream||null,
+      labels: issue.labels||[], checklist: issue.checklist||[],
+      start_date: issue.start||null, end_date: issue.end||null,
+      description: issue.desc||'', created_by: issue.createdBy||null,
+      created_by_name: issue.createdByName||null,
+    };
+    const { data, error } = await sb.from('issues').upsert(row, { onConflict: 'key' }).select().single();
+    if (error) { console.error('upsertIssueByKey', error); return { error }; }
+    return { data: Cloud.mapIssueFromDB(data) };
   },
   async deleteIssue(id) {
     const sb = await this.waitForClient();
@@ -3102,10 +3120,14 @@ function importExcel(input) {
       const wb = XLSX.read(e.target.result, {type:'binary'});
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws);
-      let imported = 0;
-      const promises = [];
+      // Build a deduped list keyed by the export `ID` column. Rows without an ID
+      // are treated as brand-new issues (no key → DB trigger assigns one).
+      const seen = new Set();
+      const work = [];
       rows.forEach(row => {
         if (!row.Title) return;
+        const key = row.ID ? String(row.ID).trim() : '';
+        if (key) { if (seen.has(key)) return; seen.add(key); }
         let checklist = [];
         if (row.Checklist) {
           try {
@@ -3113,17 +3135,37 @@ function importExcel(input) {
             if (Array.isArray(parsed)) checklist = parsed.map(c => ({ text: String(c.text||''), done: !!c.done })).filter(c=>c.text);
           } catch(_) {}
         }
-        const issue = {
+        work.push({
+          key: key || null,
           title: row.Title, type: row.Type||'Task', status: row.Status||'To Do',
           priority: row.Priority||'Medium', assignee: row.Assignee||'',
-          workstream: row.Workstream||'', labels: row.Labels?row.Labels.split(',').map(l=>l.trim()):[],
+          workstream: row.Workstream||'', labels: row.Labels?String(row.Labels).split(',').map(l=>l.trim()).filter(Boolean):[],
           start: row.StartDate||'', end: row.EndDate||'', desc: row.Description||'', checklist,
           createdBy: currentUser?.id||null, createdByName: currentUser?.name||'System'
-        };
-        promises.push(Cloud.upsertIssue(issue).then(saved => { if (saved) { DB.issues.push(saved); imported++; }}));
+        });
+      });
+      let inserted = 0, updated = 0, failed = 0;
+      const promises = work.map(issue => {
+        if (issue.key) {
+          // Restore/update by key
+          const existed = DB.issues.some(x => x.key === issue.key);
+          return Cloud.upsertIssueByKey(issue).then(res => {
+            if (res.error) { failed++; return; }
+            const saved = res.data;
+            const i = DB.issues.findIndex(x => x.id === saved.id || x.key === saved.key);
+            if (i >= 0) { DB.issues[i] = saved; updated++; }
+            else { DB.issues.push(saved); existed ? updated++ : inserted++; }
+          });
+        }
+        return Cloud.upsertIssue(issue).then(saved => {
+          if (!saved) { failed++; return; }
+          DB.issues.push(saved); inserted++;
+        });
       });
       Promise.allSettled(promises).then(() => {
-        toast(`Imported ${imported} issues`, 'success');
+        const parts = [`${inserted} added`, `${updated} updated`];
+        if (failed) parts.push(`${failed} failed`);
+        toast(`Import complete — ${parts.join(', ')}`, failed ? 'error' : 'success');
         renderIssues(); updateOpenCount(); populateFilters();
       });
     } catch(err) { toast('Import failed: ' + err.message, 'error'); }
