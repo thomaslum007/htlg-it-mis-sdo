@@ -3120,10 +3120,14 @@ function importExcel(input) {
       const wb = XLSX.read(e.target.result, {type:'binary'});
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws);
-      let imported = 0;
-      const promises = [];
+      // Build a deduped list keyed by the export `ID` column. Rows without an ID
+      // are treated as brand-new issues (no key → DB trigger assigns one).
+      const seen = new Set();
+      const work = [];
       rows.forEach(row => {
         if (!row.Title) return;
+        const key = row.ID ? String(row.ID).trim() : '';
+        if (key) { if (seen.has(key)) return; seen.add(key); }
         let checklist = [];
         if (row.Checklist) {
           try {
@@ -3131,17 +3135,37 @@ function importExcel(input) {
             if (Array.isArray(parsed)) checklist = parsed.map(c => ({ text: String(c.text||''), done: !!c.done })).filter(c=>c.text);
           } catch(_) {}
         }
-        const issue = {
+        work.push({
+          key: key || null,
           title: row.Title, type: row.Type||'Task', status: row.Status||'To Do',
           priority: row.Priority||'Medium', assignee: row.Assignee||'',
-          workstream: row.Workstream||'', labels: row.Labels?row.Labels.split(',').map(l=>l.trim()):[],
+          workstream: row.Workstream||'', labels: row.Labels?String(row.Labels).split(',').map(l=>l.trim()).filter(Boolean):[],
           start: row.StartDate||'', end: row.EndDate||'', desc: row.Description||'', checklist,
           createdBy: currentUser?.id||null, createdByName: currentUser?.name||'System'
-        };
-        promises.push(Cloud.upsertIssue(issue).then(saved => { if (saved) { DB.issues.push(saved); imported++; }}));
+        });
+      });
+      let inserted = 0, updated = 0, failed = 0;
+      const promises = work.map(issue => {
+        if (issue.key) {
+          // Restore/update by key
+          const existed = DB.issues.some(x => x.key === issue.key);
+          return Cloud.upsertIssueByKey(issue).then(res => {
+            if (res.error) { failed++; return; }
+            const saved = res.data;
+            const i = DB.issues.findIndex(x => x.id === saved.id || x.key === saved.key);
+            if (i >= 0) { DB.issues[i] = saved; updated++; }
+            else { DB.issues.push(saved); existed ? updated++ : inserted++; }
+          });
+        }
+        return Cloud.upsertIssue(issue).then(saved => {
+          if (!saved) { failed++; return; }
+          DB.issues.push(saved); inserted++;
+        });
       });
       Promise.allSettled(promises).then(() => {
-        toast(`Imported ${imported} issues`, 'success');
+        const parts = [`${inserted} added`, `${updated} updated`];
+        if (failed) parts.push(`${failed} failed`);
+        toast(`Import complete — ${parts.join(', ')}`, failed ? 'error' : 'success');
         renderIssues(); updateOpenCount(); populateFilters();
       });
     } catch(err) { toast('Import failed: ' + err.message, 'error'); }
