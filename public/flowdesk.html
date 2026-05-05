@@ -131,19 +131,7 @@ body.login-mode { display: block; }
 /* ----- Editable dashboard ----- */
 .dash-toolbar { display:flex; gap:8px; align-items:center; flex-wrap:nowrap; overflow-x:auto; margin-bottom:12px; }
 .dash-toolbar .spacer { flex:1; }
-.dash-toolbar select { 
-  background: var(--surface2); 
-  color: var(--text); 
-  border: 1px solid var(--border); 
-  border-radius: 6px; 
-  padding: 5px 24px 5px 8px; /* Added right padding for the arrow icon */
-  font-family: var(--mono, monospace); 
-  font-size: 12px; 
-  min-width: 80px; /* Reduced from 110px */
-  max-width: 140px; /* Optional: prevents them from growing too large */
-  flex: 0 1 auto; /* Allows them to shrink if the screen is small */
-  cursor: pointer;
-}
+.dash-toolbar select { background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 24px 5px 8px; /* Added right padding for the arrow icon */font-family: var(--mono, monospace); font-size: 12px; min-width: 80px; /* Reduced from 110px */max-width: 140px; /* Optional: prevents them from growing too large */flex: 0 1 auto; /* Allows them to shrink if the screen is small */cursor: pointer; }
 .gridstack-host { background: transparent; }
 .gridstack-host .grid-stack-item-content { background: var(--surface); border:1px solid var(--border); border-radius: var(--radius,8px); padding:14px; overflow:auto; display:flex; flex-direction:column; }
 .gridstack-host.editing .grid-stack-item-content { border-style: dashed; }
@@ -562,27 +550,30 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
  <!-- DASHBOARD -->
 <div class="content page active" id="page-dashboard">
 
-  <!-- Single unified filter bar -->
-  <div class="filter-bar">
-    <div class="filter-title">Filters</div>
-    <div class="filter-row" id="dash_filterRow"></div>
+<!-- Single unified filter bar -->
+<div class="filter-bar">
+  <div class="filter-title">Filters</div>
+  <div class="filter-row" id="dash_filterRow">
+    <!-- Your existing filter dropdowns render here via JS -->
 
-    <!-- Period row merged in -->
-    <div class="filter-row" style="margin-top:6px;">
-      <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;flex-shrink:0;align-self:center;">Period</label>
-      <select id="dashYear"></select>
-      <select id="dashQuarter">
-        <option value="">All Quarters</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
-      </select>
-      <select id="dashMonth">
-        <option value="">All Months</option>
-        <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
-        <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
-        <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
-        <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
-      </select>
-    </div>
+    <!-- Inline divider -->
+    <div style="width:1px;background:var(--border,#e5e7eb);align-self:stretch;margin:0 4px;flex-shrink:0;"></div>
+
+    <!-- Period label + selects inline -->
+    <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;flex-shrink:0;align-self:center;">Period</label>
+    <select id="dashYear" style="width:auto;flex:0 1 auto;"></select>
+    <select id="dashQuarter" style="width:auto;flex:0 1 auto;">
+      <option value="">All Quarters</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+    </select>
+    <select id="dashMonth" style="width:auto;flex:0 1 auto;">
+      <option value="">All Months</option>
+      <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+      <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+      <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+      <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+    </select>
   </div>
+</div>
 
   <!-- Separate toolbar row for Edit Dashboard only -->
   <div class="dash-toolbar">
