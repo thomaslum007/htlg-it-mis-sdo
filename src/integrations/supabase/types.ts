@@ -290,7 +290,6 @@ export type Database = {
           created_at: string
           dept: string
           email: string
-          force_password_reset: boolean
           id: string
           name: string
           responsibilities: string
