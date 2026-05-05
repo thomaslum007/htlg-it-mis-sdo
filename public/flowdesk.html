@@ -1101,11 +1101,28 @@ const Cloud = {
       description: issue.desc||'', created_by: issue.createdBy||null,
       created_by_name: issue.createdByName||null,
     };
-    // Only send `key` on update (when row exists). Let DB trigger assign on new inserts.
-    if (issue.key) row.key = issue.key;
+    // Send `key` only when we already have an id (existing row) so the trigger can
+    // assign keys for fresh inserts. For imports, use upsertIssueByKey instead.
+    if (issue.key && issue.id) row.key = issue.key;
+    if (!row.id) delete row.id;
     const { data, error } = await sb.from('issues').upsert(row).select().single();
     if (error) { console.error('upsertIssue', error); toast('Save failed: ' + error.message,'error'); return null; }
     return Cloud.mapIssueFromDB(data);
+  },
+  // Upsert by `key` — used by Excel import so the same backup file does not create duplicates.
+  async upsertIssueByKey(issue) {
+    const sb = await this.waitForClient();
+    const row = {
+      key: issue.key, title: issue.title, type: issue.type, status: issue.status,
+      priority: issue.priority, assignee: issue.assignee||null, workstream: issue.workstream||null,
+      labels: issue.labels||[], checklist: issue.checklist||[],
+      start_date: issue.start||null, end_date: issue.end||null,
+      description: issue.desc||'', created_by: issue.createdBy||null,
+      created_by_name: issue.createdByName||null,
+    };
+    const { data, error } = await sb.from('issues').upsert(row, { onConflict: 'key' }).select().single();
+    if (error) { console.error('upsertIssueByKey', error); return { error }; }
+    return { data: Cloud.mapIssueFromDB(data) };
   },
   async deleteIssue(id) {
     const sb = await this.waitForClient();
