@@ -1,104 +1,65 @@
-## Scope check & honesty up front
+# Fix Dashboard Light-Mode Theming + Single-Row Period Filter
 
-This request is large: a full **drag/resize/configurable widget dashboard** (KPI / Bar / Pie / Line / Table / Matrix), **global Year/Quarter/Month filters**, **per-user persisted layouts**, **chart responsiveness fixes**, **password show/hide**, **force-password-reset fix**, and a **"stuck at Signing in" auth fix** with cookie/storage cleanup and 5s fallback.
+All work is in `public/flowdesk.html`. Light-mode already exists (`body.theme-light` overrides CSS variables), but several dashboard rules use **hardcoded dark hex fallbacks** (e.g. `var(--card,#161620)`, `var(--bg2,#1a1a24)`) and Chart.js options use **hardcoded grey/white** colors. Because the variables `--card` and `--bg2` are never defined anywhere, the fallbacks always win — that's why these areas stay dark in light mode.
 
-Doing all of this in one pass risks exactly what frustrated you last time: lots of code touched, hard to verify, and easy for one piece to break another. I'm splitting it into **3 small phases**. Each phase is independently testable. You approve phase 1; I do only that; you verify; then we move on. This minimizes wasted credits.
+## Root cause summary
 
----
-
-### Phase 1 — Auth & UX fixes (smallest, highest value)
-File: `public/flowdesk.html` only. No DB changes.
-
-1. **"Stuck at Signing in" fix**
-   - Add a 5s watchdog around `signInWithPassword`. If it doesn't resolve, run `clearAuthStorage()`, reset the button, show toast "Sign-in timed out — please retry."
-   - On every login attempt, call `clearAuthStorage()` + `sb.auth.signOut({ scope: 'local' })` *before* sign-in to guarantee fresh tokens (no stale-token reuse).
-   - On `onAuthStateChange` `SIGNED_OUT` or expired session: wipe storage + cookies (already wired) and force redirect to login.
-2. **Show/Hide password** (eye icon) on: login password, force-reset new password, force-reset confirm password, admin Add/Edit User password field. Pure inline SVG, no library.
-3. **Force password reset on next login — fix**
-   - Verify the modal opens *before* the app shell renders (move `openForcedPasswordReset()` check to run inside `bootstrapAuth` after profile load, blocking nav).
-   - On submit, `sb.auth.updateUser({ password })` then `update profiles set force_password_reset=false`. Confirm both succeed before closing modal.
-   - Re-test the admin checkbox actually writes `force_password_reset=true` via the `admin-users` edge function (it already does — verifying flow).
-
-### Phase 2 — Dashboard responsiveness fix (no new features yet)
-File: `public/flowdesk.html` only.
-
-1. Wrap each `<canvas>` in a fixed-aspect container (`position:relative; aspect-ratio: 16/9; min-height:220px`).
-2. Pass `responsive:true, maintainAspectRatio:true` to Chart.js (currently uses defaults — that's why charts grow on zoom-out).
-3. Add CSS `min-width`/`min-height` to KPI tiles; switch `.grid-4` to `repeat(auto-fit, minmax(220px, 1fr))`.
-4. Responsive breakpoints already exist for sidebar at ≤768px; add `@media(max-width:1024px){ .grid-2 { grid-template-columns: 1fr; } }` and ensure `.main` has correct left margin so sidebar never overlaps tiles.
-
-### Phase 3 — Edit Dashboard mode (the big one)
-Only after Phase 1 & 2 are confirmed working. File: `public/flowdesk.html` + 1 migration.
-
-**DB migration (1 new table):**
-```
-dashboard_layouts (
-  user_id uuid PK references auth.users on delete cascade,
-  layout  jsonb not null default '[]'::jsonb,
-  filters jsonb not null default '{}'::jsonb,
-  updated_at timestamptz default now()
-)
-```
-RLS: user can read/write only their own row; admins can read all.
-
-**UI (admin-only):**
-- "Edit Dashboard" toggle button in dashboard header (shown only if `currentUser.role==='admin'`).
-- When ON: each widget gets a drag handle + resize corner; floating "+ Add Widget" button bottom-right; "Save", "Reset Layout", "Cancel" buttons in header.
-- Grid: 12-column CSS grid, each widget stores `{i, x, y, w, h, type, config}`. Use **Gridstack.js** via CDN (lightweight, no build step) — best fit for static HTML.
-
-**Widget types:**
-| Type | Config inputs |
+| Element | Current source of dark color |
 |---|---|
-| KPI Tile | metric (Count / Sum / Distinct Count) + field (Status, Priority, Assignee, Workstream, Type, Labels) |
-| Bar / Pie / Line | X-axis field, Y-axis aggregation (Count / Sum), groupBy (optional) |
-| Table | columns (multi-select from issue fields) |
-| Matrix (pivot) | row group, column group, value aggregation |
+| Period filter `<select>`s | `.dash-toolbar select` uses `var(--bg2,#1a1a24)` — `--bg2` is undefined → always `#1a1a24` |
+| KPI / chart widget tiles | `.gridstack-host .grid-stack-item-content` uses `var(--card,#161620)` — `--card` undefined |
+| Add Widget modal card, inputs, label colors, suggest box | Same — `var(--card,#161620)`, `var(--bg2,#1a1a24)` fallbacks |
+| Chart legends / ticks / gridlines | Hardcoded `#9090a8` and `rgba(255,255,255,0.05)` in Chart.js options |
+| Period filter wrapping to 3 rows | `.dash-toolbar { flex-wrap: wrap }` + selects with no `min-width` cap → at narrow viewports the action buttons push selects to new rows |
 
-**Global filters (top of dashboard, always visible):**
-- Year / Quarter / Month dropdowns derived from `issues.start_date`. Filters apply to every widget render.
-- Persisted in `dashboard_layouts.filters` per user.
+## Changes
 
-**Save / Reset:**
-- "Save Layout" upserts the row.
-- "Reset Layout" deletes the row → falls back to a sensible default layout (the current dashboard).
+### 1. CSS: replace hardcoded fallbacks with real theme variables (lines ~131–164)
 
----
+Swap every `var(--card,#161620)` → `var(--surface)`, `var(--bg2,#1a1a24)` → `var(--surface2)`, `var(--border,#2a2a38)` → `var(--border)`, `var(--text2,#9090a8)` → `var(--text2)`, `var(--text,#e6e6f0)` → `var(--text)`, `var(--surface2,#22222e)` → `var(--surface3)`. Affects:
 
-## Technical notes
+- `.dash-toolbar select`
+- `.gridstack-host .grid-stack-item-content`
+- `.widget-title`, `.widget-actions button`, `.widget-kpi .lbl`
+- `.widget-table th`, `.widget-table th/td` border
+- `.modal-backdrop .modal-card`
+- `.modal-card label`, `.modal-card select`, `.modal-card input`
+- `.ww-suggest`, `.ww-suggest-item`
 
-- All widget queries run client-side over `DB.issues` already in memory — no new edge functions needed.
-- Chart.js stays (no new chart lib).
-- Gridstack only loaded when admin enters Edit Mode (`<script>` injected on demand) — zero cost for non-admins.
-- No changes to `src/integrations/supabase/client.ts` or `types.ts`.
+Also update the inline `<label style="...color:var(--text2,#9090a8)">Period</label>` on line 556 to drop the hardcoded fallback.
 
-## Verification checklist (you run after each phase)
+### 2. CSS: single-row Period filter (line 132 + 134)
 
-**Phase 1**
-- [ ] Sign in → loads ≤5s, never stuck.
-- [ ] Sign out → sign in again with no manual cookie clearing.
-- [ ] Eye icon toggles password visibility on all 4 fields.
-- [ ] Admin ticks "force reset" on a user → that user's next login shows reset modal *before* dashboard, can't bypass.
+Change `.dash-toolbar` from `flex-wrap: wrap` to `flex-wrap: nowrap; overflow-x: auto;` so the Period label, three selects, spacer, and edit buttons stay on one row. Give `.dash-toolbar select` a `min-width: 110px` and `flex-shrink: 0` so they don't get squashed but don't expand to full width either.
 
-**Phase 2**
-- [ ] Browser zoom in/out → charts stay inside their cards, never balloon.
-- [ ] Resize window 1920 → 1024 → 768 → 414: no overlap, no horizontal scroll, sidebar behaves.
+### 3. Chart.js theme-aware colors (lines ~2124, 2138, 1904–1905)
 
-**Phase 3**
-- [ ] Admin sees "Edit Dashboard" button; non-admin doesn't.
-- [ ] Drag/resize a widget, save, reload → layout persists.
-- [ ] Add KPI "Count of Status = Open" → number matches Issues page.
-- [ ] Add Bar chart "Issues by Workstream" → matches.
-- [ ] Year filter = 2026 → all widgets recompute.
-- [ ] Reset Layout → defaults restored.
+Add a small helper near the chart code:
+```js
+function chartTheme() {
+  const light = document.body.classList.contains('theme-light');
+  return {
+    tick:  light ? '#4a4a60' : '#9090a8',
+    grid:  light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)',
+    legend:light ? '#1a1a25' : '#e8e8f0',
+  };
+}
+```
+Use `chartTheme()` inside `renderStatusChart`, `renderPriorityChart`, and the custom-widget chart block (line 1900) for `legend.labels.color`, `scales.x/y.ticks.color`, and `scales.y.grid.color`.
 
----
+### 4. Re-render charts on theme toggle
 
-## What I need from you
+`toggleTheme()` (line ~3235) already has a comment "Re-render charts so legend colors update" but doesn't actually re-render. Add a call to `renderDashboard()` (or `renderStatusChart(); renderPriorityChart();` plus custom widget refresh) when the dashboard page is active, so charts pick up the new theme immediately.
 
-Reply with one of:
-- **"Go phase 1"** — I do only auth + password UX + force-reset fix.
-- **"Go phase 1 + 2"** — auth fixes + dashboard responsiveness.
-- **"Go all phases"** — full build (more credits, longer to verify).
-- Or edits to the plan.
+### 5. Audit pass
 
-Default recommendation: **do phase 1 first**, since the auth bug is blocking you from even using the app properly. Phase 3 isn't useful if you can't reliably log in.
+Search for any remaining `#0f`, `#16`, `#1a`, `#22`, `#2a` literals inside dashboard-related rules and inline styles, replace with the appropriate `var(--surface…/--text…/--border)` token. Verify no other component uses undefined `--card` or `--bg2`.
+
+## Verification (after build)
+
+1. Toggle to light mode on the Dashboard tab — Period selects, KPI tiles, both default charts, and custom widgets all read with light backgrounds and dark text.
+2. Click Edit Dashboard → Add Widget — modal, inputs, labels, suggestion chips are all legible in light mode.
+3. Period filter (label + 3 selects + edit buttons) sits on one row at the current viewport (798px CSS width).
+4. Toggle back to dark mode — everything still looks correct.
+
+No database, auth, or backend changes required.
