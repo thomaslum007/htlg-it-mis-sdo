@@ -3369,7 +3369,11 @@ function openHelpfulLinksEditor() {
     for (let i=0;i<draft.length;i++) {
       const r = draft[i];
       if (!r.title.trim() || !r.url.trim()) { errBox.textContent = `Row ${i+1}: title and URL are required.`; return; }
-      try { new URL(r.url); } catch(_) { errBox.textContent = `Row ${i+1}: invalid URL.`; return; }
+      let parsedUrl;
+      try { parsedUrl = new URL(r.url); } catch(_) { errBox.textContent = `Row ${i+1}: invalid URL.`; return; }
+      if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+        errBox.textContent = `Row ${i+1}: only http(s) URLs are allowed.`; return;
+      }
     }
     if (draft.length > 20) { errBox.textContent = 'Maximum of 20 links.'; return; }
     try {
