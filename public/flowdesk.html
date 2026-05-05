@@ -2112,16 +2112,26 @@ function commitWidgetModal(editId) {
   if (typeof saveDashLayout === 'function') saveDashLayout();
 }
 
+function chartTheme() {
+  const light = document.body.classList.contains('theme-light');
+  return {
+    tick:   light ? '#4a4a60' : '#9090a8',
+    grid:   light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)',
+    legend: light ? '#1a1a25' : '#e8e8f0',
+  };
+}
+
 function renderStatusChart(issues) {
   const ctx = document.getElementById('statusChart');
   if (!ctx) return;
   if (chartInstances.status) chartInstances.status.destroy();
   const src = issues || DB.issues;
   const counts = DB.statuses.map(s => src.filter(i => i.status === s.name).length);
+  const th = chartTheme();
   chartInstances.status = new Chart(ctx, {
     type: 'doughnut',
     data: { labels: DB.statuses.map(s=>s.name), datasets: [{ data: counts, backgroundColor: DB.statuses.map(s=>s.color+'99'), borderColor: DB.statuses.map(s=>s.color), borderWidth: 2 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#9090a8', font: { family: 'DM Mono', size: 11 } } } } }
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: th.legend, font: { family: 'DM Mono', size: 11 } } } } }
   });
 }
 
@@ -2132,10 +2142,11 @@ function renderPriorityChart(issues) {
   const colors = { Critical:'#ff4d4d', High:'#ff8c42', Medium:'#ffd166', Low:'#06d6a0' };
   const src = issues || DB.issues;
   const counts = DB.priorities.map(p => src.filter(i => i.priority === p).length);
+  const th = chartTheme();
   chartInstances.priority = new Chart(ctx, {
     type: 'bar',
     data: { labels: DB.priorities, datasets: [{ data: counts, backgroundColor: DB.priorities.map(p=>colors[p]+'88'), borderColor: DB.priorities.map(p=>colors[p]), borderWidth: 2, borderRadius: 4 }] },
-    options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color:'#9090a8', font:{family:'DM Mono'} }, grid:{color:'rgba(255,255,255,0.05)'} }, x: { ticks: { color:'#9090a8', font:{family:'DM Mono'} }, grid:{color:'transparent'} } }, plugins: { legend:{ display:false } } }
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color:th.tick, font:{family:'DM Mono'} }, grid:{color:th.grid} }, x: { ticks: { color:th.tick, font:{family:'DM Mono'} }, grid:{color:'transparent'} } }, plugins: { legend:{ display:false } } }
   });
 }
 
