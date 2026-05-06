@@ -3158,12 +3158,13 @@ function importExcel(input) {
         });
       });
       let inserted = 0, updated = 0, failed = 0;
+      const errors = [];
       const promises = work.map(issue => {
         if (issue.key) {
           // Restore/update by key
           const existed = DB.issues.some(x => x.key === issue.key);
           return Cloud.upsertIssueByKey(issue).then(res => {
-            if (res.error) { failed++; return; }
+            if (res.error) { failed++; errors.push(`${issue.key}: ${res.error.message || res.error}`); return; }
             const saved = res.data;
             const i = DB.issues.findIndex(x => x.id === saved.id || x.key === saved.key);
             if (i >= 0) { DB.issues[i] = saved; updated++; }
@@ -3171,7 +3172,7 @@ function importExcel(input) {
           });
         }
         return Cloud.upsertIssue(issue).then(saved => {
-          if (!saved) { failed++; return; }
+          if (!saved) { failed++; errors.push(`${issue.title}: insert failed`); return; }
           DB.issues.push(saved); inserted++;
         });
       });
@@ -3179,6 +3180,7 @@ function importExcel(input) {
         const parts = [`${inserted} added`, `${updated} updated`];
         if (failed) parts.push(`${failed} failed`);
         toast(`Import complete — ${parts.join(', ')}`, failed ? 'error' : 'success');
+        if (errors.length) console.error('Import errors:', errors);
         renderIssues(); updateOpenCount(); populateFilters();
       });
     } catch(err) { toast('Import failed: ' + err.message, 'error'); }
