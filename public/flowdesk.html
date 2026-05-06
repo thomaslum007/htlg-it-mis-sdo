@@ -1012,14 +1012,20 @@ const Cloud = {
   },
   async loadAll() {
     const sb = await this.waitForClient();
-    const [p, r, w, i, a, s] = await Promise.all([
+    const [p, r, w, i, a, s, pr] = await Promise.all([
       sb.rpc('list_profiles_public'),
       sb.from('user_roles').select('user_id,role'),
       sb.from('workstreams').select('*').order('created_at'),
       sb.from('issues').select('*').order('created_at'),
       sb.from('activities').select('*').order('created_at', { ascending: false }).limit(200),
       sb.from('settings_kv').select('*'),
+      // Fetch force_password_reset separately since list_profiles_public()
+      // intentionally omits it for security. Authenticated users can read it
+      // from profiles per RLS; only the admin Edit User UI uses it.
+      sb.from('profiles').select('id, force_password_reset'),
     ]);
+    const forceResetById = {};
+    if (pr && pr.data) for (const row of pr.data) forceResetById[row.id] = !!row.force_password_reset;
     const roleByUser = {};
     if (r.data) for (const row of r.data) {
       // Pick the highest-privilege role if multiple exist
@@ -1028,7 +1034,11 @@ const Cloud = {
         roleByUser[row.user_id] = row.role;
       }
     }
-    if (p.data) DB.users = p.data.map(row => Cloud.mapProfileFromDB(row, roleByUser[row.id] || 'viewer'));
+    if (p.data) DB.users = p.data.map(row => {
+      const mapped = Cloud.mapProfileFromDB(row, roleByUser[row.id] || 'viewer');
+      mapped.forcePasswordReset = !!forceResetById[row.id];
+      return mapped;
+    });
     if (w.data) DB.workstreams = w.data.map(this.mapWsFromDB);
     if (i.data) DB.issues = i.data.map(this.mapIssueFromDB);
     if (a.data) DB.activity = a.data.map(this.mapActivityFromDB).reverse();
