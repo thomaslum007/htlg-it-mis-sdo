@@ -1226,10 +1226,13 @@ async function cloudHandleChange(kind) {
     const { data } = await sb.from('workstreams').select('*').order('created_at');
     if (data) DB.workstreams = data.map(Cloud.mapWsFromDB);
   } else if (kind === 'users') {
-    const [p, r] = await Promise.all([
+    const [p, r, pr] = await Promise.all([
       sb.rpc('list_profiles_public'),
       sb.from('user_roles').select('user_id,role'),
+      sb.from('profiles').select('id, force_password_reset'),
     ]);
+    const forceResetById = {};
+    if (pr && pr.data) for (const row of pr.data) forceResetById[row.id] = !!row.force_password_reset;
     const roleByUser = {};
     if (r.data) {
       const rank = { admin:1, pm:2, dev:3, viewer:4 };
@@ -1237,7 +1240,11 @@ async function cloudHandleChange(kind) {
         if (!roleByUser[row.user_id] || rank[row.role] < rank[roleByUser[row.user_id]]) roleByUser[row.user_id] = row.role;
       }
     }
-    if (p.data) DB.users = p.data.map(row => Cloud.mapProfileFromDB(row, roleByUser[row.id] || 'viewer'));
+    if (p.data) DB.users = p.data.map(row => {
+      const mapped = Cloud.mapProfileFromDB(row, roleByUser[row.id] || 'viewer');
+      mapped.forcePasswordReset = !!forceResetById[row.id];
+      return mapped;
+    });
     // Refresh currentUser role/profile too in case it changed
     if (currentUser) {
       const me = DB.users.find(x => x.id === currentUser.id);
