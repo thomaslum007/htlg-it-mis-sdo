@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <script src="https://unpkg.com/lucide@latest"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FlowDesk — Project Management Suite</title>
+<title>Linearis — Project Management Suite</title> /*formerly FlowDesk */
 
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -446,7 +446,7 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
   <div class="login-box">
     <div class="login-logo">
       <div style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;background:var(--accent);border-radius:12px;font-size:24px;margin-bottom:12px;"><i data-lucide="zap"></i></div>
-      <div class="login-title">FlowDesk</div>
+      <div class="login-title">Linearis</div>  /*formerly FlowDesk */
       <div class="login-sub">Project Management Suite</div>
     </div>
     <div class="login-error" id="loginError">Invalid email or password.</div>
@@ -473,7 +473,7 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
     </div>
     <button id="authPrimaryBtn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px;" onclick="doAuthSubmit()">Sign In</button>
     <div class="pw-tip" id="pwTip" style="display:none;font-size:11px;color:var(--text3,#6c6c80);margin-top:4px;line-height:1.4;">Password must be at least 6 characters, include one uppercase letter, one lowercase letter, one number, and one special character.</div>
-    <div id="authHint" style="margin-top:16px;font-size:12px;color:var(--text3);text-align:center;">Sign in with your FlowDesk account. The first user to sign up becomes the admin.</div>
+    <div id="authHint" style="margin-top:16px;font-size:12px;color:var(--text3);text-align:center;">Sign in with your Linearis account.</div>
   </div>
 </div>
 
@@ -486,7 +486,7 @@ body.sidebar-collapsed .user-card { justify-content: center; padding: 8px 0; }
     <div class="logo-mark">
       <i data-lucide="zap"></i>
       <div>
-        <div class="logo-text">FlowDesk</div>
+        <div class="logo-text">Linearis</div> /*formerly FlowDesk */
         <div class="logo-sub">v2.0 PRO</div>
       </div>
     </div>
@@ -1387,7 +1387,7 @@ function switchAuthTab(mode) {
   } else {
     if (su) su.style.display = 'none';
     if (btn) btn.textContent = 'Sign In';
-    if (hint) hint.textContent = 'Sign in with your FlowDesk account.';
+    if (hint) hint.textContent = 'Sign in with your Linearis account.';
     if (tUp) tUp.classList.remove('btn-primary');
     if (tIn) tIn.classList.add('btn-primary');
     document.getElementById('loginPass').setAttribute('autocomplete','current-password');
